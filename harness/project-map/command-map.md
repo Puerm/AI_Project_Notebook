@@ -11,6 +11,7 @@
 | `python harness/scripts/check_structure.py` | 检查项目结构完整性 | `harness/scripts/check_structure.py` |
 | `python harness/scripts/search_notes.py <关键词>` | 搜索笔记 | `harness/scripts/search_notes.py` |
 | `python harness/scripts/export_report.py` | 导出项目理解报告 | `harness/scripts/export_report.py` |
+| `python harness/scripts/analyze_project.py <目标路径>` | 智能项目分析引擎 (v0.3.2: 多源码根 / --llm LLM增强(模块描述/数据流/技术栈) / --depth 目录深度 / --source-root 源码根 / .env 支持) | `harness/scripts/analyze_project.py` |
 
 ## Claude Code 命令
 

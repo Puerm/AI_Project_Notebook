@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/test_analyze_project.py::TestMapWriter::test_generate_data_flow_without_llm_shows_guidance tests/test_analyze_project.py::TestMapWriter::test_generate_data_flow_empty_shows_guidance -v)",
+      "Bash(python -m pytest tests/ -v)",
+      "Read(//c/Users/21093/Desktop/BioTec/harness/**)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\21093\\\\Desktop\\\\BioTec\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Read(//c/Users/21093/Desktop/BioTec/back/**)",
+      "Read(//c/Users/21093/Desktop/BioTec/back/src/**)",
+      "Read(//c/Users/21093/Desktop/BioTec/front/**)"
+    ]
+  }
+}

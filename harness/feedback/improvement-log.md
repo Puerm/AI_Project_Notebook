@@ -16,6 +16,96 @@
 
 ## 记录
 
+### 2026-05-21 — LLM 调用缺少差异化超时与分批策略
+
+- **当前状态**: `_call_llm()` 所有调用统一 10 秒超时，单次 prompt 不论大小
+- **问题**: v0.3.2 data-flow 的 prompt 包含完整模块依赖 JSON + 12 个入口函数，远超其他增强点，DeepSeek 处理超时。其他 4 个 LLM 调用均成功，唯独 data-flow 挂掉
+- **建议**: `_call_llm()` 新增 `timeout` 参数；大 prompt 自动分批（每批 ≤5 个）；Plan 阶段预估 prompt 规模
+- **影响范围**: `llm_assistant.py`
+- **状态**: 临时修复（v0.3.2 已加分批+30秒超时），框架级方案待定
+
+### 2026-05-21 — 多源码根检测缺少去重和父子过滤
+
+- **当前状态**: `detect_source_roots()` 返回所有候选，不做去重和父子包含过滤
+- **问题**: BioTec 中 `back/` 和 `front/` 互为子目录，模块分组时交叉污染——front 源码根下出现 back 模块
+- **建议**: 父子包含过滤（A 是 B 祖先 → 只保留 B）；最小文件数阈值（< 5 文件不作为独立源码根）；多源码根 module-map 分区显示
+- **影响范围**: `scanner.py`、`map_writer.py`
+- **状态**: 待处理
+
+### 2026-05-21 — 源码根检测不够深入，粒度过粗
+
+- **当前状态**: `detect_source_roots()` 找到最上层候选即停止
+- **问题**: BioTec 的 `back/python/paper_agent/` 是真正的 Python 源码根，但算法只返回了 `back/`
+- **建议**: 递归深入直到无可拆子包的最小单元
+- **影响范围**: `scanner.py`
+- **状态**: 待处理
+
+### 2026-05-21 — Generator 缺少"Spec 功能覆盖度"自检
+
+- **当前状态**: Generator 完成后运行 `check_structure.py` + `pytest` 验证，两项只检查结构完整性和功能正确性
+- **问题**: v0.3.1 Spec 明确要求 LLM 增强模块描述（"模块描述在无 LLM 时基于函数/类名做规则推断"）和数据流（"LLM 启用时由 LLM 推断关键数据流路径"），但 Generator 实际只在 `analyze_project.py` 第 163-184 行对 overview 一句话描述调了 LLM，模块描述完全走模板、数据流直接输出"LLM 未启用"模板。Spec 要求的 3 个 LLM 增强点只实现了 1 个，第二和第三个被遗漏
+- **建议**:
+  1. Generator 完成后对照 Spec 功能清单逐项自检，确认每个功能点都已实现
+  2. Reviewer 审查清单增加"Spec 覆盖度"维度——对照 Spec 逐条检查
+  3. IMP 任务描述应更精确：不能写"增强模块描述"而是"在 --llm 启用时调用 enhance_module_description() 为每个模块生成描述"
+- **影响范围**: Generator agent 定义、Reviewer agent 定义、Plan 模板
+- **状态**: 待处理
+
+### 2026-05-21 — analyze_project.py 运行位置与配置归属不清晰
+
+- **当前状态**: `analyze_project.py` 既可被 `init_project.py` 部署到目标项目，也可从 Notebook 侧以目标路径参数运行。README 最初将 `.env` 指引写在目标项目侧，造成了"分析引擎在哪运行、配置在哪维护"的混淆
+- **问题**: Spec/Plan 从未明确"分析引擎的运行位置"——是从 Notebook 分析外部项目，还是部署后在目标项目内自分析。两种模式对配置（.env、API Key）、依赖（Node.js/acorn）、路径处理的要求不同
+- **建议**:
+  1. 明确 v0.3 的分析模式为"Notebook → 目标项目"（分析引擎在 Notebook 侧运行，以目标路径为参数），.env 和依赖均在 Notebook 侧管理
+  2. 如果未来需要目标项目自分析能力，应作为独立模式设计（`analyze_project.py` 在目标项目内无参数运行，读取本地配置）
+  3. Spec 模板新增"## 运行位置与配置归属"章节
+- **影响范围**: Spec 模板、README.md、analyze_project.py 帮助文本
+- **状态**: 待处理
+
+### 2026-05-21 — v0.3 实战暴露：PM Spec 缺少"关键概念定义"环节
+
+- **当前状态**: PM 讨论流程分三阶段——理解需求 → 细化方案 → 输出 Spec。Spec 模板包含"要解决什么问题 / 版本目标 / 功能清单 / 风险与未决问题"
+- **问题**: v0.3 的 module-map 将"文件"等同于"模块"，导致 BioTec 项目输出 682 行无意义的文件列表。根因是 PM 阶段从未定义"什么是模块"——是按文件？按目录？按逻辑分组？这个概念模糊贯穿了后续 Planner → Generator 全链路
+- **建议**:
+  1. PM 讨论新增"关键概念定义"步骤——对 spec 中出现的核心概念（如"模块"、"依赖"、"分析粒度"）在进入 Planner 前明确定义
+  2. Spec 模板新增"## 关键概念定义"章节，列出每个核心术语在本 spec 中的确切含义
+  3. Planner 被要求检查 spec 中的概念定义是否清晰，不清晰则退回 PM
+- **影响范围**: PM agent 定义、Spec 模板、Planner agent 定义
+- **状态**: 待处理
+
+### 2026-05-21 — v0.3 实战暴露：Plan 缺少"输出质量约束"
+
+- **当前状态**: Plan 的 IMP 任务描述"要做什么"（生成 module-map.md），但不描述"什么是好的输出"（多少行以内、必须聚合到模块级、依赖图只显示内部依赖）
+- **问题**: v0.3 三个输出文件全部缺乏可读性约束——module-map 682 行平铺、data-flow 逐条 import 未聚合、directory-map 298KB 全展开。三个文件对用户几乎没有帮助
+- **建议**:
+  1. Plan 中每个 IMP 任务新增"输出质量标准"——如"module-map 表格行数不超过 50 行（模块级聚合，非文件级）"、"directory-map 展开深度不超过 3 层"、"data-flow 只显示项目内部模块依赖，过滤 stdlib 和第三方包"
+  2. Generator 实现前先评估目标项目规模，输出超过阈值时警告并建议重新设计
+  3. Explorer 侦察报告增加"目标项目规模评估"——文件数、目录深度、语言分布，供 Planner 设定合理的质量约束
+- **影响范围**: Planner agent 定义、Generator agent 定义、Explorer agent 定义、Plan 模板
+- **状态**: 待处理
+
+### 2026-05-21 — v0.3 实战暴露：缺少"用户上手引导"作为强制交付物
+
+- **当前状态**: v0.3 实现了 LLM 增强功能，通过环境变量 `ANTHROPIC_API_KEY` / `LLM_API_KEY` 配置。但 `--help` 不提示需要哪些环境变量，没有 `.env` 文件支持，API Key 缺失时静默降级不告知用户
+- **问题**: 用户拿到工具后不知道如何启用核心功能（LLM 增强），甚至不知道这个功能存在。Spec 将 LLM 配置方式标记为"未决"，Plan 选了环境变量方案，但没有一个环节要求"告诉用户怎么用"
+- **建议**:
+  1. Spec 模板新增"## 用户上手"章节——描述用户第一次使用该功能的完整步骤（安装依赖、配置环境、运行命令）
+  2. CLI 命令必须包含：`--help` 输出环境变量说明、API Key 未设置时的引导提示（而非静默降级）、`README` 中的配置示例
+  3. 规则层新增"用户引导规则"——任何需要配置的 CLI 命令必须包含可发现的配置引导
+- **影响范围**: PM Spec 模板、Generator agent 定义、coding-rules.md
+- **状态**: 待处理
+
+### 2026-05-21 — v0.3 实战暴露：Generator 缺少"输出可用性"自检
+
+- **当前状态**: Generator 完成 IMP 任务后运行 `check_structure.py` 和 `pytest` 验证，这两项只检查结构完整性和功能正确性
+- **问题**: v0.3 的输出通过了结构检查（46/46）、测试全部通过（71/71），但对用户完全不可用。生成 298KB 的 directory-map、682 行的 module-map、逐条列出的 data-flow——技术上"正确"，实际上"无用"
+- **建议**:
+  1. Generator 完成实现后增加"输出可用性自检"步骤——用自己刚写的工具分析一个真实项目，检查输出文件的体积和行数，超过合理阈值时自我标记为"需优化"
+  2. Reviewer 审查清单增加"用户体验"维度——不仅检查代码正确性，也检查输出是否对人有意义
+  3. IMP 任务完成标准从"生成了文件"升级为"生成了对人有用的文件"
+- **影响范围**: Generator agent 定义、Reviewer agent 定义、coding-rules.md
+- **状态**: 待处理
+
 ### 2026-05-21 — v0.2 部署内容不够通用：feedback、rules、workflow 全部照搬
 
 - **当前状态**: `init_project.py` 通过 `shutil.copytree(harness/, ...)` 将整个 `harness/` 目录（含 feedback、rules、workflow 等）完整复制到目标项目

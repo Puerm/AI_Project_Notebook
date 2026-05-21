@@ -145,8 +145,9 @@ def make_template_command_map():
 | `python harness/scripts/help.py` | 打印所有可用命令 | `harness/scripts/help.py` |
 | `python harness/scripts/check_structure.py` | 检查项目结构完整性 | `harness/scripts/check_structure.py` |
 | `python harness/scripts/search_notes.py <关键词>` | 搜索笔记 | `harness/scripts/search_notes.py` |
-| `python harness/scripts/export_report.py` | 导出项目理解报告 | `harness/scripts/export_report.py` |
 | `python harness/scripts/init_project.py <目标路径>` | 初始化新项目地图 | `harness/scripts/init_project.py` |
+| `python harness/scripts/analyze_project.py <目标路径>` | 智能项目分析引擎 | `harness/scripts/analyze_project.py` |
+| `python harness/scripts/export_report.py` | 导出项目理解报告 | `harness/scripts/export_report.py` |
 
 ## 变更规则
 
@@ -254,6 +255,10 @@ def init_project(target_path):
     # IMP-4: 创建空的 .claude/skills/ 目录
     os.makedirs(os.path.join(target_claude, "skills"), exist_ok=True)
     print(f"已创建空的 .claude/skills/ 目录")
+
+    # 创建 app/analyzer/ 目录骨架（check_structure.py 需要）
+    os.makedirs(os.path.join(target, "app", "analyzer"), exist_ok=True)
+    print(f"已创建 app/analyzer/ 目录骨架")
 
     dir_map_content = generate_directory_map(target, project_name)
     dir_map_path = os.path.join(target_harness, "project-map", "directory-map.md")

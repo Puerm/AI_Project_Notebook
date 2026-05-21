@@ -18,6 +18,7 @@ REQUIRED_DIRS = [
     ".claude/agents",
     ".claude/commands",
     ".claude/skills",
+    "app/analyzer",
 ]
 
 REQUIRED_FILES = [
@@ -27,6 +28,7 @@ REQUIRED_FILES = [
     "harness/scripts/check_structure.py",
     "harness/scripts/help.py",
     "harness/scripts/search_notes.py",
+    "harness/scripts/analyze_project.py",
     "harness/scripts/export_report.py",
     "harness/skills/README.md",
     "harness/workflow/README.md",

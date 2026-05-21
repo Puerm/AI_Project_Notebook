@@ -6,7 +6,7 @@
 
 ## 版本
 
-**v0.1** — 最小命令行版本。仅支持本地文件操作，不依赖数据库、Web 服务或大模型 API。
+**v0.3.1** — 智能项目分析引擎。自动扫描项目源码并生成结构化项目理解地图，可选 LLM 语义增强。
 
 ## 快速开始
 
@@ -25,14 +25,34 @@ python harness/scripts/search_notes.py <关键词>
 
 # 导出报告
 python harness/scripts/export_report.py
+
+# 智能分析项目
+python harness/scripts/analyze_project.py <目标路径>
+
+# 带深度控制和源码根指定
+python harness/scripts/analyze_project.py <目标路径> --depth 2 --source-root src/
+
+# 启用 LLM 语义增强
+python harness/scripts/analyze_project.py <目标路径> --llm
+
+# 查看完整选项
+python harness/scripts/analyze_project.py --help
 ```
 
 ## 在新项目中使用
 
 ```bash
-# 在新项目中初始化 harness 骨架
+# 第一步：初始化 harness 骨架（从 Notebook 往目标项目部署）
 python harness/scripts/init_project.py <目标项目路径>
+
+# 第二步：分析目标项目，自动填写其 project-map 文件
+python harness/scripts/analyze_project.py <目标项目路径>
+
+# 启用 LLM 语义增强（需先在 Notebook 根目录配置 API Key）
+python harness/scripts/analyze_project.py <目标项目路径> --llm
 ```
+
+> **提示**：LLM 增强需要 Anthropic API Key。在 Notebook 项目根目录创建 `.env` 文件写入 `ANTHROPIC_API_KEY=你的Key`，或设置同名环境变量。
 
 ## 目录结构
 
@@ -41,6 +61,7 @@ AI-Project-Notebook/
 ├── README.md              # 项目说明
 ├── CLAUDE.md              # Claude Code 配置入口
 ├── app/                   # 应用源码
+│   └── analyzer/          # 智能项目分析引擎
 ├── data/                  # 用户数据（不可删除）
 ├── tests/                 # 测试代码
 ├── openspec/              # OpenSpec 规范与变更管理

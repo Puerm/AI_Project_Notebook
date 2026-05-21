@@ -4,6 +4,102 @@
 
 ## 变更记录
 
+### 2026-05-21: v0.3.2 BioTec --llm 实测 — 暴露多源码根串扰 + data-flow 超时 + 粒度问题
+
+- **类型**: 测试/反馈
+- **范围**: 无新代码修改（data-flow 分批+超时已临时修复）
+- **摘要**: BioTec --llm 实测发现 4 个问题：
+  - data-flow LLM 调用超时（10s 不够，已临时改分批+30s）
+  - 多源码根 back/front 互相串扰（缺父子过滤）
+  - `back/python` 被当成一个模块（源码根检测不够深入）
+  - directory-map 仍有 harness 部署残留
+- **影响文件**: `llm_assistant.py`（data-flow 分批+超时修复）、feedback 日志
+- **验证**: 待用户重新测试
+
+### 2026-05-21: v0.3.2 LLM 集成修复 — Generator 审查反馈修复 (FIX-IMP-1/2/3)
+
+- **类型**: 修复
+- **范围**: `app/analyzer/llm_assistant.py` (1 文件)
+- **摘要**: 修复 v0.3.2 审查发现的 3 个应用代码问题
+  - **FIX-IMP-1**: `.env` 加载可控化 — `_get_llm_config()` 及 9 个公开函数新增 `enable_dotenv` 参数（默认 True），测试环境可传 False 跳过 `.env` 加载
+  - **FIX-IMP-2**: `_get_module_dir()` 支持 source_root 前缀剥离 — 新增 `source_root` 参数和 `_find_source_root_for_file()` 辅助函数，`detect_entry_functions()` 改为按文件匹配 source_root
+  - **FIX-IMP-3**: 批量模块描述使用各模块自身 source_root — `_batch_individual()` 和 `_batch_single_call()` 改为从 `mod.get("source_root", source_root)` 取标签
+- **验证**: `python harness/scripts/check_structure.py` 通过 (46/46), `python -m pytest tests/ -v` 68/71 通过 (3 个失败为期待结果，需 Tester 同步更新 FIX-TST-1/2)
+- **待 Tester**: FIX-TST-1 (测试传入 `enable_dotenv=False`), FIX-TST-2 (data-flow 断言更新为 "未检测到入口函数")
+
+### 2026-05-21: v0.3.2 LLM 集成修复 — 多源码根/LLM三维护增强/入口函数检测
+
+- **类型**: 新功能
+- **范围**: 6 个应用代码文件修改，无新建文件
+- **摘要**: 实现 v0.3.2 LLM 集成修复，解决真机测试暴露的"项目分析不透彻"问题
+  - **IMP-1**: 版本号 0.3.1 -> 0.3.2
+  - **IMP-2**: scanner.py 新增 `detect_source_roots()` 多源码根检测（Python包/js项目分别识别，父子去重）
+  - **IMP-3**: overview.py `_detect_tech_stack()` 改为深目录递归搜索（3层），新增 `_gather_tech_features()` 收集技术特征供LLM上下文使用
+  - **IMP-4**: llm_assistant.py 新增 `enhance_module_descriptions_batch()` 自适应批量模块描述（<=10逐模块，>10单次批处理），`_call_llm()` max_tokens改为可配置
+  - **IMP-5**: llm_assistant.py 新增 `enhance_data_flow_llm()` LLM数据流推断
+  - **IMP-6**: llm_assistant.py 新增 `enhance_tech_stack_llm()` LLM技术栈/项目类型推断
+  - **IMP-7**: llm_assistant.py 新增 `detect_entry_functions()` 硬编码规则检测入口函数（Python argparse/click/typer + JS express/fastify）
+  - **IMP-8**: map_writer.py 表头新增"源码根"列，`generate_data_flow()` 签名改为 `entry_functions`，`_parse_module_table_rows()` 表头检测修复
+  - **IMP-9**: analyze_project.py 编排重构：多源码根分组、LLM三维护增强（模块描述/数据流/技术栈）、无LLM入口函数降级
+- **影响文件**: `app/analyzer/__init__.py`, `app/analyzer/scanner.py`, `app/analyzer/overview.py`, `app/analyzer/llm_assistant.py`, `app/analyzer/map_writer.py`, `harness/scripts/analyze_project.py`, `harness/project-map/command-map.md`
+- **验证**: `python harness/scripts/check_structure.py` 通过 (46/46), `python -m pytest tests/` 68/71 通过 (3 个失败：1个.env预存在问题 + 2个data-flow行为变更预期)
+
+### 2026-05-21: v0.3.1 输出质量修复 — 修复 v0.3 真机测试暴露的 4 个质量问题
+
+- **类型**: 修复
+- **范围**: 6 个应用代码文件修改，无新建文件
+- **摘要**: 修复 v0.3 BioTec 真机测试暴露的输出质量问题
+  - **IMP-1**: 版本号更新 0.3.0 -> 0.3.1
+  - **IMP-2**: scanner.py 新增 `detect_source_root()` 自动识别源码根目录
+  - **IMP-3**: map_writer.py 目录树新增 `--depth` 参数（默认 3）和折叠显示
+  - **IMP-4**: map_writer.py module-map 重构为目录级模块，新增 `_group_modules_by_directory`、`_infer_module_description`、`_compute_module_dependencies`，表头改为模块路径/描述/函数类/依赖
+  - **IMP-5**: map_writer.py data-flow 重定义为 LLM 引导模板（无 LLM 时不生成逐条 import）
+  - **IMP-6**: map_writer.py `generate_all` 签名更新，新增 `max_depth` 和 `source_root` 参数
+  - **IMP-7**: llm_assistant.py 新增 `_load_dotenv()` .env 解析和 `check_api_key_available()` API Key 引导
+  - **IMP-8**: analyze_project.py CLI 新增 `--depth`/`--source-root`，移除 `--no-llm`，新增源码根检测和目录级模块分组编排逻辑
+  - **IMP-9**: help.py 版本号 v0.3 -> v0.3.1，命令描述增强
+  - **generator-fix**: README.md 版本号 v0.3 -> v0.3.1，新增 --depth/--source-root/--llm 使用示例
+- **影响文件**: `app/analyzer/__init__.py`, `app/analyzer/scanner.py`, `app/analyzer/map_writer.py`, `app/analyzer/llm_assistant.py`, `harness/scripts/analyze_project.py`, `harness/scripts/help.py`, `README.md`
+- **验证**: `python harness/scripts/check_structure.py` 通过 (46/46), `python -m pytest tests/` 47/51 通过 (4 个失败为期待结果，由 Tester 更新 TST-6)
+
+### 2026-05-21: v0.3 BioTec 真机测试 — 暴露 4 个质量问题
+
+- **类型**: 测试/反馈
+- **范围**: 无代码修改，仅记录反馈
+- **摘要**: 对 BioTec 项目（682 源文件）运行 `analyze_project.py`，产出 4 个 project-map 文件但质量不可用
+  - **问题 1 — module-map**: 682 行平铺表格，每文件一行。根因：Spec 将"文件"等同于"模块"，未定义模块聚合粒度
+  - **问题 2 — data-flow**: 逐条 import 语句列出（含 stdlib 和第三方包），未聚合为模块级依赖
+  - **问题 3 — directory-map**: 298KB 全展开目录树，未限制深度
+  - **问题 4 — 无 .env / 引导**: `ANTHROPIC_API_KEY` 环境变量未在任何地方告知用户，缺 Key 时静默降级
+  - **根因**: PM 缺"关键概念定义"、Plan 缺"输出质量约束"、Generator 缺"输出可用性自检"、全链路缺"用户上手引导"
+  - 已记录 4 条改进到 `harness/feedback/improvement-log.md`
+- **影响文件**: harness/feedback/improvement-log.md, harness/project-map/change-map.md
+- **验证**: —
+
+### 2026-05-21: v0.3 审查反馈修复 — scanner/map_writer/init_project
+
+- **类型**: 修复
+- **范围**: `app/analyzer/scanner.py`, `app/analyzer/map_writer.py`, `harness/scripts/init_project.py`
+- **摘要**: 修复 v0.3 项目分析引擎的三个审查发现的问题
+  - **D1**: scanner.py EXCLUDE_DIRS 增加 `harness`，与 init_project.py 对齐，避免扫描自身 harness 目录
+  - **D2**: init_project.py 的 command-map 模板追加 `analyze_project.py` 条目，按功能分组排列
+  - **D3**: map_writer.py 重写 `_merge_sections()` 为按 ## 段落增量合并（保留 MANUAL 段落），`generate_module_map()` 支持行级增量更新（MANUAL 行保留、新模块追加、已有模块更新）
+- **验证**: `python harness/scripts/check_structure.py` 通过 (46/46), `python -m pytest tests/ -v` 20/20 通过
+
+### 2026-05-21: v0.3 智能项目分析引擎 — 自动生成项目理解地图
+
+- **类型**: 新功能
+- **范围**: `app/analyzer/` + `harness/scripts/analyze_project.py` + project-map 文档更新
+- **摘要**: 实现 v0.3 智能项目分析引擎，自动扫描目标项目并生成 4 个 project-map 文件
+  - 创建 `app/analyzer/` 包（6 个模块）：scanner（目录扫描）、parser（代码解析）、overview（项目概览）、llm_assistant（LLM 语义增强）、map_writer（地图文件生成）
+  - 创建 `harness/scripts/analyze_project.py` CLI 入口命令，编排分析流水线
+  - 修改 `harness/scripts/check_structure.py` — REQUIRED_DIRS 新增 `app/analyzer/`，REQUIRED_FILES 新增 `analyze_project.py`
+  - 修改 `harness/scripts/help.py` — 版本号更新为 v0.3，注册新命令
+  - 更新 6 个 project-map 文档（overview/module-map/command-map/directory-map/data-flow/change-map）
+  - 更新 `README.md` — 版本号 v0.3，快速开始新增分析命令示例
+- **影响文件**: 6 新建 + 2 修改脚本 + 7 文档更新 = 15 文件
+- **验证**: `python harness/scripts/check_structure.py` 待验证
+
 ### 2026-05-21: 工作流回环机制 — Explorer/Tester 阻塞路由
 
 - **类型**: 新功能

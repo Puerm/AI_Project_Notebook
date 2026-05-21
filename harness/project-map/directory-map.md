@@ -3,29 +3,50 @@
 项目完整目录结构及每个目录的职责说明。
 
 ```
-AI-Project-Notebook/
-├── README.md              # 项目说明与快速开始
-├── CLAUDE.md              # Claude Code 工作配置
-├── tree.txt               # 目录树快照
-├── app/                   # 应用源码（v0.2+ 填充）
-├── data/                  # 用户数据，受保护目录，不可删除
-├── tests/                 # 测试代码，命名 test_<module>.py
-├── openspec/              # OpenSpec 规范驱动开发
-│   ├── changes/           # 进行中的变更
-│   │   └── archive/       # 已完成归档的变更
-│   └── specs/             # 能力规范文档
-├── harness/               # Harness 框架（本项目核心）
-│   ├── rules/             # 可执行规则（编码、数据安全、工作流）
-│   ├── scripts/           # 自动化脚本（结构检查等）
-│   ├── skills/            # Agent 技能定义
-│   ├── workflow/          # Agent 工作流编排（多 Agent 调用序列）
-│   ├── project-map/       # 项目知识地图（本文件所在目录）
-│   └── feedback/          # 错误日志与改进建议
-└── .claude/               # Claude Code 配置
-    ├── agents/            # Agent 角色 prompt
-    ├── commands/          # 自定义斜杠命令 (含 workflow/ 子目录)
-    └── skills/            # 工作流技能（OpenSpec 等）
+    AI_Project_Notebook/
+    ├── app/
+    │   └── analyzer/  # Python 源码
+    │       ├── __init__.py
+    │       ├── llm_assistant.py
+    │       ├── map_writer.py
+    │       ├── overview.py
+    │       ├── parser.py
+    │       └── scanner.py
+    ├── data/  # 数据
+    ├── openspec/
+    │   ├── changes/
+    │   │   ├── archive/
+    │   │   ├── v0.2-harness-deployment/  # 文档
+    │   │   │   ├── change-summary.md
+    │   │   │   └── plan.md
+    │   │   ├── v0.3-project-analysis/  # 文档
+    │   │   │   ├── change-summary.md
+    │   │   │   ├── fix-plan.md
+    │   │   │   ├── plan.md
+    │   │   │   └── recon.md
+    │   │   ├── v0.3.1-output-quality-fix/  # 文档
+    │   │   │   ├── change-summary.md
+    │   │   │   ├── plan.md
+    │   │   │   └── test-report.md
+    │   │   └── v0.3.2-llm-integration-fix/  # 文档
+    │   │       └── plan.md
+    │   └── specs/  # 文档
+    │       ├── pm-agent.md
+    │       ├── project.md
+    │       ├── v0.2-harness-deployment.md
+    │       ├── v0.3-project-analysis.md
+    │       ├── v0.3.1-output-quality-fix.md
+    │       └── v0.3.2-llm-integration-fix.md
+    ├── tests/  # 测试
+    │   ├── test_analyze_project.py
+    │   ├── test_export_report.py
+    │   ├── test_help.py
+    │   ├── test_init_project.py
+    │   └── test_search_notes.py
+    ├── CLAUDE.md
+    └── README.md
 ```
+
 
 ## 变更规则
 
