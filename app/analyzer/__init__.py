@@ -1,4 +1,3 @@
-# analyzer — 智能项目分析引擎，自动生成项目理解地图
-# v0.3: scanner + parser + overview + llm_assistant + map_writer
+# analyzer — 智能项目分析引擎，v0.4 渐进式披露引擎
 
-__version__ = "0.3.2"
+__version__ = "0.4.0"

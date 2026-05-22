@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python \"c:/Users/21093/Desktop/AI_Project_Notebook/harness/scripts/check_structure.py\")"
+      "Bash(python \"c:/Users/21093/Desktop/AI_Project_Notebook/harness/scripts/check_structure.py\")",
+      "Bash(git push *)"
     ]
   }
 }

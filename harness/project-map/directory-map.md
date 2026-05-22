@@ -7,6 +7,8 @@
     ├── app/
     │   └── analyzer/  # Python 源码
     │       ├── __init__.py
+    │       ├── domain_analyzer.py
+    │       ├── guiding_files.py
     │       ├── llm_assistant.py
     │       ├── map_writer.py
     │       ├── overview.py

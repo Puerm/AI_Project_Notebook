@@ -4,6 +4,22 @@
 
 ## 变更记录
 
+### 2026-05-22: v0.4 渐进式披露引擎 — 引导文件收集 + LLM 业务板块识别 + 单一概览输出
+
+- **类型**: 新功能
+- **范围**: 2 个新建文件 + 4 个修改应用文件 + 5 个文档更新
+- **摘要**: 实现 v0.4 渐进式披露分析引擎，用聚焦的引导文件分析替代全量源码扫描
+  - **IMP-1**: 版本号 0.3.2 -> 0.4.0
+  - **IMP-2**: 新建 `guiding_files.py` — 引导文件收集 (GUIDING_FILE_PATTERNS) + 目录摘要 (≤30行, UUID/编译产物折叠)
+  - **IMP-3**: 新建 `domain_analyzer.py` — LLM 业务板块识别 (max_tokens=2048, timeout=60) + 降级模式
+  - **IMP-4**: `llm_assistant.py` 砍掉 13 个旧函数，仅保留 4 个基础设施函数 (_load_dotenv, _get_llm_config, _call_llm, check_api_key_available)
+  - **IMP-5**: `map_writer.py` 砍掉 15 个旧函数/常量，新增 `generate_progressive_overview()` 单一输出函数
+  - **IMP-6**: `analyze_project.py` 完全重写: 砍掉 --depth/--source-root，3 步新流程 (引导文件→板块识别→概览输出)
+  - **IMP-7**: help.py 版本号 v0.3.1 -> v0.4
+  - **IMP-8**: README/command-map/module-map/directory-map 文档同步更新
+- **影响文件**: `guiding_files.py` (新), `domain_analyzer.py` (新), `__init__.py`, `llm_assistant.py`, `map_writer.py`, `analyze_project.py`, `help.py`, README.md, command-map.md, module-map.md, directory-map.md, data-flow.md, change-map.md
+- **验证**: `python harness/scripts/check_structure.py` 通过 (46/46), `python -m pytest tests/` 待 Tester 更新
+
 ### 2026-05-21: v0.3.2 BioTec --llm 实测 — 暴露多源码根串扰 + data-flow 超时 + 粒度问题
 
 - **类型**: 测试/反馈

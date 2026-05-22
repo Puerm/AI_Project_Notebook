@@ -1,17 +1,52 @@
 # Data Flow
 
-项目中数据的产生、存储、流转路径。
+v0.4 渐进式披露引擎的数据流转路径。
 
-> 未检测到入口函数，无法自动推断数据流路径。
-> 请使用 `--llm` 参数重新运行分析以启用 LLM 语义推断。
-> 或在此手动填写数据流分析内容。
+## 分析流水线
 
+```
+target_path/
+    │
+    ├── [Step 1] guiding_files.py
+    │   ├── collect_guiding_files() → 引导文件内容 (found/missing)
+    │   └── generate_directory_summary() → 目录结构摘要 (≤30行)
+    │
+    ├── [Step 2] domain_analyzer.py
+    │   ├── _build_domain_analysis_prompt() → LLM prompt
+    │   ├── _call_llm() → LLM 响应 (max_tokens=2048, timeout=60)
+    │   └── _parse_domain_response() → 结构化 domain_result
+    │       └── 降级: _degraded_domain_result()
+    │
+    └── [Step 3] map_writer.py
+        └── generate_progressive_overview()
+            └── → project-overview.md (单一输出文件)
+```
 
-## 待分析的数据流 源码根: `app/analyzer`
+## 数据结构
 
-- 入口函数 -> 处理节点 -> 数据变换路径
-- （使用 --llm 自动生成，或手动填写）
+### domain_result (domain_analyzer.py 输出)
 
+```json
+{
+    "one_liner": "string (≤50字)",
+    "tech_stack": ["string", ...],
+    "domains": [{
+        "name": "string (≤15字)",
+        "description": "string (≤60字)",
+        "evidence": "string",
+        "paths": ["string", ...],
+        "confidence": "高 | 中 | 低"
+    }],
+    "relationships": [{
+        "from": "string",
+        "to": "string",
+        "type": "依赖 | 调用 | 数据流 | 配置",
+        "evidence": "string"
+    }],
+    "next_steps": ["string", "string", "string"],
+    "source": "llm | degraded"
+}
+```
 
 ## 变更规则
 
