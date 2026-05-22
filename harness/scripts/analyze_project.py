@@ -1,4 +1,4 @@
-# analyze_project.py — 智能项目分析引擎 v0.4 渐进式披露
+# analyze_project.py — 智能项目分析引擎 v0.5 渐进式披露 + digest 全量三维分析
 
 import argparse
 import os
@@ -19,7 +19,7 @@ from app.analyzer.llm_assistant import check_api_key_available
 
 def main():
     parser = argparse.ArgumentParser(
-        description="智能项目分析引擎 v0.4 — 渐进式披露：引导文件 → LLM 业务板块识别 → 输出概览",
+        description="智能项目分析引擎 v0.5 — 渐进式披露 + --digest 全量文件三维度分析",
         epilog=(
             "环境变量 (LLM 必需):\n"
             "  ANTHROPIC_API_KEY   Anthropic API Key\n"
@@ -41,6 +41,14 @@ def main():
     parser.add_argument(
         "--quiet", "-q", action="store_true", default=False,
         help="精简输出模式"
+    )
+    parser.add_argument(
+        "--digest", action="store_true", default=False,
+        help="启用 codebase-digest 全量文件收集 + LLM 三维度分析 (架构/用户故事/风险)"
+    )
+    parser.add_argument(
+        "--max-size", type=int, default=10240,
+        help="digest 最大输出大小(KB), 默认 10240 (10 MB)"
     )
 
     args = parser.parse_args()
@@ -67,6 +75,117 @@ def main():
     if not args.quiet:
         print(f"分析目标: {target_path}")
         print(f"输出目录: {output_dir}")
+
+    # ── Digest 模式 ──
+    if args.digest:
+        from app.analyzer.digest_collector import collect_digest
+        from app.analyzer.dimension_analyzer import (
+            analyze_architecture, analyze_user_stories, analyze_risk,
+        )
+
+        # Step D1: Digest collection
+        if not args.quiet:
+            print("[digest/1] 收集全量文件...")
+        digest_result = collect_digest(target_path, max_size_kb=args.max_size)
+        if digest_result["status"] == "ok":
+            digest_text = digest_result["text"]
+            if not args.quiet:
+                print(f"  收集到 {digest_result['stats']['files']} 个文件, "
+                      f"{len(digest_text)} 字符")
+        elif digest_result["status"] == "cdigest_unavailable":
+            print("警告: codebase-digest 未安装，回退到引导文件模式。", file=sys.stderr)
+            print("  安装: pip install codebase-digest", file=sys.stderr)
+            digest_text = None
+        else:
+            print(f"警告: digest 收集失败 ({digest_result.get('error', 'unknown')})，"
+                  "回退到引导文件模式。", file=sys.stderr)
+            digest_text = None
+
+        # Step D2: Business domain analysis (always run, same as non-digest)
+        if not args.quiet:
+            print("[digest/2] 业务板块识别...")
+        try:
+            guiding_result = collect_guiding_files(target_path)
+        except Exception as e:
+            print(f"[digest/2] 引导文件收集失败: {type(e).__name__}: {e}", file=sys.stderr)
+            guiding_result = {"found": [], "missing": []}
+
+        try:
+            dir_summary = generate_directory_summary(target_path)
+        except Exception as e:
+            print(f"[digest/2] 目录摘要生成失败: {type(e).__name__}: {e}", file=sys.stderr)
+            dir_summary = f"项目根: {project_name}\n(目录摘要生成失败)"
+
+        try:
+            domain_result = analyze_business_domains(
+                guiding_result, dir_summary, project_name,
+                enable_dotenv=True,
+            )
+        except Exception as e:
+            print(f"[digest/2] 板块识别失败: {type(e).__name__}: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        if not args.quiet:
+            domains_count = len(domain_result.get("domains", []))
+            print(f"  识别到 {domains_count} 个业务板块")
+
+        # Step D3: Generate project-overview.md
+        if not args.quiet:
+            print("[digest/3] 生成项目概览...")
+        try:
+            generate_progressive_overview(
+                domain_result, output_dir,
+                project_name=project_name,
+                llm_enabled=True,
+            )
+        except Exception as e:
+            print(f"[digest/3] 文件生成失败: {type(e).__name__}: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        # Step D4-D6: Three-dimension analysis (only if digest succeeded)
+        if digest_text:
+            # D4: Architecture analysis
+            if not args.quiet:
+                print("[digest/4] 架构分析...")
+            arch_result = analyze_architecture(
+                digest_text, project_name, target_path, enable_dotenv=True,
+            )
+            if not args.quiet:
+                print(f"  {arch_result['status']}: {arch_result['file_path']}")
+            arch_content = arch_result["content"]
+
+            # D5: User stories analysis
+            if not args.quiet:
+                print("[digest/5] 用户故事重建...")
+            stories_result = analyze_user_stories(
+                digest_text, arch_content, project_name, target_path, enable_dotenv=True,
+            )
+            if not args.quiet:
+                print(f"  {stories_result['status']}: {stories_result['file_path']}")
+            stories_content = stories_result["content"]
+
+            # D6: Risk analysis
+            if not args.quiet:
+                print("[digest/6] 风险分析...")
+            risk_result = analyze_risk(
+                digest_text, arch_content, stories_content,
+                project_name, target_path, enable_dotenv=True,
+            )
+            if not args.quiet:
+                print(f"  {risk_result['status']}: {risk_result['file_path']}")
+
+        if not args.quiet:
+            print(f"\n分析完成，输出到 {output_dir}")
+            print(f"  - project-overview.md")
+            if digest_text:
+                analysis_dir = os.path.join(target_path, "analysis")
+                print(f"  - {analysis_dir}/architecture.md")
+                print(f"  - {analysis_dir}/user-stories.md")
+                print(f"  - {analysis_dir}/risk-analysis.md")
+
+        return
+
+    # ── 非 digest 模式（保持现有流程不变）──
 
     # Step 1: Collect guiding files + directory summary
     if not args.quiet:

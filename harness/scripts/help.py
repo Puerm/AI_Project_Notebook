@@ -11,7 +11,7 @@ COMMANDS = [
     ("python harness/scripts/check_structure.py", "检查项目目录和关键文件完整性"),
     ("python harness/scripts/search_notes.py <关键词>", "在 project-map 和 feedback 中搜索关键词"),
     ("python harness/scripts/export_report.py", "导出完整项目理解报告"),
-    ("python harness/scripts/analyze_project.py <目标路径>", "智能项目分析引擎 (v0.4 渐进式披露 — LLM 业务板块识别)"),
+    ("python harness/scripts/analyze_project.py <目标路径>", "智能项目分析引擎 (v0.5 --digest 全量文件分析 + LLM 三维度报告)"),
     ("", ""),
     ("--- 手工操作 ---", ""),
     ("cat harness/project-map/overview.md", "查看项目总览"),
@@ -19,7 +19,7 @@ COMMANDS = [
 ]
 
 if __name__ == "__main__":
-    print("AI Project Notebook v0.4 — 可用命令")
+    print("AI Project Notebook v0.5 — 可用命令")
     print("=" * 50)
     for cmd, desc in COMMANDS:
         if cmd.startswith("---"):

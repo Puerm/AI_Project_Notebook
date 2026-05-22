@@ -6,7 +6,7 @@
 
 ## 版本
 
-**v0.4** — 渐进式披露引擎。收集引导文件 + LLM 识别业务板块，生成单一项目概览文档。LLM 为必需依赖。
+**v0.5** — 渐进式披露引擎。收集引导文件 + LLM 识别业务板块，生成单一项目概览文档。支持 `--digest` 全量文件三维度分析（架构/用户故事/风险）。LLM 为必需依赖。
 
 ## 快速开始
 
@@ -29,6 +29,10 @@ python harness/scripts/export_report.py
 # 渐进式分析项目（LLM 必需）
 python harness/scripts/analyze_project.py <目标路径>
 
+# 全量文件三维度分析（架构/用户故事/风险，需安装 codebase-digest）
+pip install codebase-digest
+python harness/scripts/analyze_project.py <目标路径> --digest
+
 # 查看完整选项
 python harness/scripts/analyze_project.py --help
 ```
@@ -41,6 +45,9 @@ python harness/scripts/init_project.py <目标项目路径>
 
 # 第二步：分析目标项目（LLM 必需，需先在 Notebook 根目录配置 API Key）
 python harness/scripts/analyze_project.py <目标项目路径>
+
+# 可选：全量文件三维度分析（需先 pip install codebase-digest）
+python harness/scripts/analyze_project.py <目标项目路径> --digest
 ```
 
 > **提示**：LLM 增强需要 Anthropic API Key。在 Notebook 项目根目录创建 `.env` 文件写入 `ANTHROPIC_API_KEY=你的Key`，或设置同名环境变量。
@@ -53,6 +60,13 @@ AI-Project-Notebook/
 ├── CLAUDE.md              # Claude Code 配置入口
 ├── app/                   # 应用源码
 │   └── analyzer/          # 智能项目分析引擎
+│       ├── digest_collector.py    # codebase-digest 全量文件收集
+│       ├── dimension_analyzer.py  # 三维度分析（架构/用户故事/风险）
+│       ├── ... (其他分析模块)
+├── analysis/              # --digest 模式输出目录（按需生成）
+│   ├── architecture.md    # 架构分析报告
+│   ├── user-stories.md    # 用户故事重建
+│   └── risk-analysis.md   # 风险分析报告
 ├── data/                  # 用户数据（不可删除）
 ├── tests/                 # 测试代码
 ├── openspec/              # OpenSpec 规范与变更管理

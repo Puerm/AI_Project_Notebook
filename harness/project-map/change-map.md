@@ -4,6 +4,31 @@
 
 ## 变更记录
 
+### 2026-05-22: v0.1.5 集成 Codebase Digest — 全量文件收集 + LLM 三维度分析
+
+- **类型**: 新功能
+- **范围**: 2 个新建文件 + 3 个修改应用文件 + 5 个文档更新
+- **摘要**: 集成 codebase-digest 包实现全量文件收集，新增三维度 LLM 分析（架构/用户故事/风险），添加 `--digest` 和 `--max-size` CLI 参数
+  - **IMP-1**: 新建 `digest_collector.py` — codebase-digest 集成、噪声过滤、max-size 截断、LLM 文本格式化
+  - **IMP-2**: 新建 `dimension_analyzer.py` — 三维度分析引擎（架构分层/用户故事重建/风险分析），含 LLM 增强和降级模式
+  - **IMP-3**: `analyze_project.py` 新增 `--digest` / `--max-size` 参数，digest 模式下 6 步流程（收集→领域分析→概览→架构→故事→风险），非 digest 模式保持现有行为不变
+  - **IMP-4**: `help.py` 版本号 v0.4 → v0.5，命令描述更新
+  - **IMP-5**: `module-map.md` 登记 2 个新模块
+  - **IMP-6**: command-map / data-flow / change-map / README 文档同步更新
+- **影响文件**: `digest_collector.py` (新), `dimension_analyzer.py` (新), `__init__.py`, `analyze_project.py`, `help.py`, module-map.md, command-map.md, data-flow.md, change-map.md, README.md
+- **验证**: `python harness/scripts/check_structure.py` 通过 (46/46), `python -m pytest tests/test_analyze_project.py` 50/51 通过 (1 个 test_help_output 失败因版本号变更，待 Tester 更新)
+
+### 2026-05-22: v0.1.5 generator-fix — 审查反馈修复 (4 个问题)
+
+- **类型**: 修复
+- **范围**: `digest_collector.py`, `dimension_analyzer.py`, `analyze_project.py`, `directory-map.md`
+- **摘要**: 修复 v0.1.5 审查发现的 4 个问题
+  - **第一类-1**: `digest_collector.py` — run_digest_collection / preprocess_digest / format_digest_for_llm / collect_digest 四个函数的多行 docstring 改为单行描述（符合 coding-rules 第 13 条）
+  - **第一类-2**: `dimension_analyzer.py` — analyze_architecture / analyze_user_stories / analyze_risk 三个函数的多行 docstring 改为单行描述（其余 8 个内部函数已为单行，无需修改）
+  - **第一类-3**: `analyze_project.py` — 移除非 digest 模式下重复的"分析目标"和"输出目录" print（已在上方统一打印）
+  - **第二类-4**: `directory-map.md` — `app/analyzer/` 目录树中补充 digest_collector.py 和 dimension_analyzer.py
+- **验证**: `python harness/scripts/check_structure.py` 通过 (46/46), `python -m pytest tests/test_analyze_project.py` 50/51 通过 (1 个 test_help_output 失败为预存问题)
+
 ### 2026-05-22: v0.4 渐进式披露引擎 — 引导文件收集 + LLM 业务板块识别 + 单一概览输出
 
 - **类型**: 新功能

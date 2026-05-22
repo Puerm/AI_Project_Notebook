@@ -52,3 +52,59 @@ target_path/
 
 - 增加新的数据文件格式后必须更新本文档
 - 增加新的数据流路径后必须更新上图
+
+---
+
+## Digest 分析流水线 (v0.5 新增)
+
+```
+target_path/
+    │
+    ├── [Step D1] digest_collector.py
+    │   ├── is_cdigest_available() → 检查 codebase-digest 包是否可用
+    │   ├── run_digest_collection() → 调用 analyze_directory() 收集全量文件
+    │   │   └── 降级: 回退到引导文件模式
+    │   ├── preprocess_digest() → 过滤 [Non-text file]、折叠编译产物目录
+    │   └── format_digest_for_llm() → 格式化为 LLM 可消费文本
+    │
+    ├── [Step D2] domain_analyzer.py + map_writer.py (保持不变)
+    │   ├── analyze_business_domains() → LLM 业务板块识别
+    │   └── generate_progressive_overview() → project-overview.md
+    │
+    ├── [Step D3] dimension_analyzer.py — LLM 三维度分析
+    │   ├── analyze_architecture(digest_text) → analysis/architecture.md
+    │   │   └── 降级: _degraded_architecture()
+    │   ├── analyze_user_stories(digest_text, arch_content) → analysis/user-stories.md
+    │   │   └── 降级: _degraded_user_stories()
+    │   └── analyze_risk(digest_text, arch_content, stories_content) → analysis/risk-analysis.md
+    │       └── 降级: _degraded_risk()
+    │
+    └── 输出 (4 个文件):
+        ├── harness/project-map/project-overview.md  (现有)
+        ├── analysis/architecture.md                  (新增)
+        ├── analysis/user-stories.md                  (新增)
+        └── analysis/risk-analysis.md                 (新增)
+```
+
+### dimension_analyzer 返回值
+
+```json
+{
+    "file_path": "analysis/architecture.md",
+    "status": "llm | degraded | error",
+    "content": "完整的 Markdown 文本"
+}
+```
+
+### digest_collector 返回值
+
+```json
+{
+    "text": "格式化后的全量文件文本",
+    "status": "ok | cdigest_unavailable | error",
+    "stats": {
+        "files": 91,
+        "total_tokens": 136794
+    }
+}
+```

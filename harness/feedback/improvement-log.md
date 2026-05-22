@@ -16,6 +16,19 @@
 
 ## 记录
 
+### 2026-05-22 — Architecture Prompt 需要"全局扫描→深入分析"两阶段设计
+
+- **当前状态**: `dimension_analyzer.py:_build_architecture_prompt()` 将所有 digest 文件内容一次性喂给 LLM，Prompt 要求直接进行分层分析
+- **问题**: v0.1.5 BioTec 实测中，LLM 被 `paper_agent/main.py` 的巨大 argparse 吸引全部注意力，只分析了这一个 CLI 脚本，完全忽略了 NestJS 后端（`back/src/`）、React 前端（`front/`）、Worker 集群等主体架构。v0.4 引导文件模式反而正确识别了 10 个业务板块
+- **建议**:
+  1. Architecture Prompt 改为两阶段：**阶段一 "全局组件识别"** — 先列出所有顶级目录及其角色（不深入任何文件），用表格输出组件名/路径/一句话角色；**阶段二 "分层深入"** — 基于阶段一的组件列表，逐层分析架构分层
+  2. digest 输出中将引导文件（README.md、package.json、docker-compose.yml）放在 prompt 最前面，保留高层信号，代码文件放在后面作为证据支撑
+  3. 考虑两轮 LLM 调用：第一轮轻量级（≤512 tokens）识别模块，第二轮完整分析；或使用单个 prompt 但明确要求先输出组件清单再分析
+  4. 第一轮调用可使用低 max_tokens 强制 LLM 收敛到全局视角
+- **影响范围**: `dimension_analyzer.py:_build_architecture_prompt()`、Prompt 模板设计
+- **状态**: 待处理
+- **严重程度**: **重大** — digest 集成的核心价值（"全面了解新项目"）因此问题未达成
+
 ### 2026-05-21 — LLM 调用缺少差异化超时与分批策略
 
 - **当前状态**: `_call_llm()` 所有调用统一 10 秒超时，单次 prompt 不论大小

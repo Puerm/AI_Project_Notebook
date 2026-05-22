@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(python \"c:/Users/21093/Desktop/AI_Project_Notebook/harness/scripts/check_structure.py\")",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "PowerShell(cdigest --help 2>&1)",
+      "PowerShell(python -m codebase_digest --help 2>&1)",
+      "Bash(python -c \"import codebase_digest; print\\(codebase_digest.__file__\\)\")",
+      "Bash(python -c \"import codebase_digest; import os; d = os.path.dirname\\(codebase_digest.__file__\\); [print\\(f\\) for f in sorted\\(os.listdir\\(d\\)\\)]\")"
     ]
   }
 }

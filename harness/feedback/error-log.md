@@ -16,6 +16,19 @@
 
 ## 记录
 
+### 2026-05-22 — v0.1.5 digest BioTec 实测：全量文件导致 LLM 架构分析严重失焦
+
+- **现象**: digest 全量文件收集后，`architecture.md` 只分析了 `back/python/paper_agent/` 一个 CLI 脚本的 argparse 参数，完全忽略了 NestJS 后端（`back/src/` 十几模块）、React 前端（`front/`）、Worker 集群（AlphaFold/AutoDock/PyRosetta 等 10+ 个计算 worker）。而 v0.4 引导文件模式产出的 `project-overview.md` 正确识别了 10 个业务板块、技术栈、板块间关系。
+- **触发**: `python harness/scripts/analyze_project.py "C:\Users\21093\Desktop\BioTec" --digest --quiet`
+- **根因**: 
+  1. 全量代码 dump 给 LLM 后，`paper_agent/main.py` 的巨大 argparse（20+ 参数）吸引了 LLM 全部注意力，被误判为"主入口"
+  2. Architecture Prompt 没有"先全局扫描再深入"的两阶段设计——LLM 应该先列出所有顶级目录和模块角色，再选择关键模块深入
+  3. digest 的全量文件淹没了 README.md、docker-compose.yml、package.json 等天然承载高层视角的引导文件——这些文件在 v0.4 中正是正确识别业务板块的关键信号
+  4. `node_modules` 虽然被 digest 默认忽略，但 `back/dist/` 编译产物仍然混入，增加了噪声
+- **解决**: 待修复。改进方向：(a) Architecture Prompt 增加"阶段一：全局组件识别"；(b) 两轮 LLM 调用——第一轮识别所有模块，第二轮深入分析；(c) digest 输出中保留引导文件的优先位置（放在 prompt 最前面）
+- **关联规则**: `harness/rules/coding-rules.md` — LLM Prompt 设计缺少"全局→局部"的渐进式分析约束
+- **严重程度**: **重大** — digest 集成核心价值（"帮助用户全面了解新项目"）未达成，全量数据反而比引导文件摘要效果更差
+
 ### 2026-05-21 — v0.3.2 BioTec --llm 实测：data-flow LLM 超时 + 多源码根串扰 + 模块粒度过粗
 
 - **现象**: 

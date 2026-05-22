@@ -807,7 +807,7 @@ class TestCLIIntegration:
     """analyze_project.py — CLI 集成 (TST-5)"""
 
     def test_help_output(self):
-        """--help 输出含新参数说明，不含已移除的 --depth/--source-root/--llm"""
+        """--help 输出含 v0.5 新参数，不含已移除的 --depth/--source-root/--llm"""
         result = _run_cli("--help")
         assert result.returncode == 0
         assert "target_path" in result.stdout
@@ -817,8 +817,11 @@ class TestCLIIntegration:
         assert "--depth" not in result.stdout
         assert "--source-root" not in result.stdout
         assert "--llm" not in result.stdout
-        # v0.4 version
-        assert "v0.4" in result.stdout or "v0.4" in result.stdout
+        # v0.5 version
+        assert "v0.5" in result.stdout
+        # New digest parameters
+        assert "--digest" in result.stdout
+        assert "--max-size" in result.stdout
         # API Key guidance
         assert "ANTHROPIC_API_KEY" in result.stdout
         assert ".env" in result.stdout
@@ -970,6 +973,38 @@ class TestCLIIntegration:
             )
             assert result.returncode == 0, f"stderr: {result.stderr}"
             assert os.path.isfile(os.path.join(custom_dir, "project-overview.md"))
+        finally:
+            for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE",
+                       "LLM_MODEL"):
+                os.environ.pop(k, None)
+            for k, v in saved.items():
+                os.environ[k] = v
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_digest_quiet_mode_exits_zero(self):
+        """--digest --quiet 模式退出码为 0（需假 Key，LLM 调用降级后不应崩溃）"""
+        saved = {}
+        for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE", "LLM_MODEL"):
+            if k in os.environ:
+                saved[k] = os.environ.pop(k)
+
+        run_env = _SUBPROCESS_ENV.copy()
+        run_env["LLM_API_KEY"] = "fake-test-key"
+        run_env["LLM_API_BASE"] = "http://127.0.0.1:1"
+
+        tmp = _make_tmpdir()
+        try:
+            _write_file(tmp, "README.md", "# Digest Test Project\n")
+            os.makedirs(os.path.join(tmp, "src"), exist_ok=True)
+            _write_file(tmp, "src/main.py", "print('hello')\n")
+
+            result = subprocess.run(
+                [sys.executable, CLI_SCRIPT, tmp, "--digest", "--quiet"],
+                capture_output=True, encoding="utf-8", env=run_env,
+            )
+            assert result.returncode == 0, f"Exit {result.returncode}, stderr: {result.stderr}"
+            overview_path = os.path.join(tmp, "harness", "project-map", "project-overview.md")
+            assert os.path.isfile(overview_path), f"Missing: {overview_path}"
         finally:
             for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE",
                        "LLM_MODEL"):
