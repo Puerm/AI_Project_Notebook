@@ -4,6 +4,21 @@
 
 ## 变更记录
 
+### 2026-05-25: Harness 自我升级引擎 v0.1 — LLM 根因诊断 + git worktree 沙盒验证 + 自动程度分层处理
+
+- **类型**: 新功能
+- **范围**: 3 新建 + 11 修改
+- **摘要**: 实现 Harness 自我升级系统 v0.1
+  - **IMP-1**: 新建 `harness/config/self-upgrade.yaml` — 自动程度配置（auto/semi-auto/disabled glob 匹配）
+  - **IMP-2**: 新建 `harness/prompts/diagnosis.txt` — LLM 诊断 prompt 模板（v1.0.0）
+  - **IMP-3**: 新建 `harness/scripts/diagnose_and_fix.py` — 自我升级主引擎（反馈信号扫描 → 24h 去重 → LLM 诊断 → 安全边界 → git worktree 沙盒验证 → 合并/降级）
+  - **IMP-4**: `.gitignore` — 追加 `upgrade-history.json`
+  - **IMP-5**: `check_structure.py` — 新增 2 目录 + 3 文件检查项
+  - **IMP-6**: 4 个 `.claude/commands/workflow/*.md` — 收尾阶段追加自我升级触发逻辑
+  - **IMP-7**: 5 个 project-map 文档同步更新
+- **影响文件**: `harness/config/self-upgrade.yaml` (新), `harness/prompts/diagnosis.txt` (新), `harness/scripts/diagnose_and_fix.py` (新), `.gitignore`, `check_structure.py`, 4 个 workflow command, 5 个 project-map 文件
+- **验证**: `python harness/scripts/check_structure.py` 52/52 通过
+
 ### 2026-05-25: fix-harness-feedback-loop — save_signals 空操作修复 + generate_rule_evolution 原子写入补全
 
 - **类型**: 修复

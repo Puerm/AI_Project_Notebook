@@ -27,6 +27,10 @@
     │   ├── scripts/  # CLI 脚本
     │   ├── skills/  # 技能目录
     │   ├── workflow/  # 工作流定义
+    │   ├── config/  # 自我升级配置
+    │   │   └── self-upgrade.yaml
+    │   ├── prompts/  # LLM prompt 模板
+    │   │   └── diagnosis.txt
     │   ├── project-map/  # 项目地图
     │   ├── feedback/  # 反馈日志
     │   └── state/  # 工作流运行时状态

@@ -22,6 +22,7 @@
 | harness\state\feedback_engine.py | 反馈信号引擎（读写/去重/模式检测） | load_signals, add_signal, save_signals, detect_patterns | FeedbackEngine |
 | harness\state\workflow_state.py | 工作流状态管理器（偏差趋势/回环决策） | init, record_stage, get_deviation_trend, should_continue_loop, to_feedback_signal | WorkflowState |
 | harness\scripts\generate_rule_evolution.py | 规则演化建议生成脚本 | - | - |
+| harness\scripts\diagnose_and_fix.py | 自我升级引擎 — 反馈信号驱动的自动诊断与修复 | main, _load_config, _check_dedup, _apply_safety_boundary, _call_llm_diagnosis, _sandbox_verify, _write_upgrade_history | - |
 | tests\test_export_report.py | 导出报告测试 | test_export_report_runs_and_returns_zero, test_export_report_contains_expected_sections, test_export_report_sections_have_numbered_source_labels | - |
 | tests\test_help.py | help 命令测试 | test_help_runs_and_returns_zero, test_help_lists_all_commands | - |
 | tests\test_init_project.py | 初始化项目测试 | test_init_project_creates_harness_dir, test_init_project_generates_directory_map_with_tree, test_init_project_refuses_existing_harness, test_init_project_refuses_nonexistent_path, test_init_project_missing_argument_exits_one | - |

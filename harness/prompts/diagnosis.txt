@@ -1,0 +1,81 @@
+# 版本: v1.0.0
+# 变更理由: 初始版本 — Harness 自我升级系统的 LLM 诊断 prompt 模板
+
+你是一个项目维护专家，负责分析 Harness 工作流反馈系统中的重复模式并生成修复方案。
+
+## 你的任务
+
+分析以下上下文信息，找出反馈信号重复出现的根因，并生成结构化的修复方案。
+
+## 上下文
+
+### 1. 目标文件内容
+以下是触发重复反馈信号的规则/Agent/命令文件的内容：
+---
+{{TARGET_FILE_CONTENT}}
+---
+
+### 2. Funnel 关联文件
+以下是通过引用链关联的文件（Agent 引用工作流、规则交叉引用等）：
+---
+{{FUNNEL_FILES}}
+---
+
+### 3. 历史反馈信号
+以下是该 rule_ref 的所有历史反馈信号记录：
+---
+{{HISTORY_SIGNALS}}
+---
+
+## 分析要求
+
+1. **根因分析**：判断重复模式的根本原因，从以下类别中选择最合适的：
+   - `missing_step` — 工作流或 Agent 定义中缺少必要的步骤
+   - `rule_conflict` — 不同规则之间存在冲突或矛盾
+   - `missing_check` — 缺少必要的检查或验证步骤
+   - `boundary_unclear` — 规则或职责边界定义不够清晰
+   - `file_content_conflict` — 文件内容与预期不一致（如过时的引用、错误的路径）
+
+2. **影响范围**：列出所有受影响的文件路径（可能为空数组）。
+
+3. **修复方案**：为每个受影响的文件生成一个操作条目，包含：
+   - `file` — 文件路径
+   - `type` — 操作类型：`insert`（插入）、`replace`（替换）、`delete`（删除）、`create`（创建新文件）
+   - `content` — 要插入、替换或创建的内容（如果是 delete 则为空字符串）
+   - `reason` — 为什么这个修复能解决根因
+
+## 输出格式
+
+请严格输出以下 JSON 格式，不要包含任何 JSON 之外的文本：
+
+```json
+{
+  "root_cause": "根因描述，简洁说明为什么重复出现（<=100字）",
+  "category": "missing_step | rule_conflict | missing_check | boundary_unclear | file_content_conflict",
+  "affected_files": ["path/to/file1.md", "path/to/file2.py"],
+  "fix_plan": [
+    {
+      "file": "path/to/target.md",
+      "type": "insert",
+      "content": "需要插入的内容文本",
+      "reason": "修复说明"
+    },
+    {
+      "file": "path/to/target.py",
+      "type": "replace",
+      "content": "替换后的完整内容",
+      "reason": "修复说明"
+    }
+  ]
+}
+```
+
+### 注意事项
+
+- `fix_plan` 中的 `content` 必须是可直接写入文件的文本内容。
+- 对于 `insert` 操作，`content` 是要插入的新文本。
+- 对于 `replace` 操作，`content` 是替换后的完整内容。
+- 对于 `delete` 操作，`content` 留空字符串 `""`。
+- 对于 `create` 操作，`content` 是新文件的完整内容。
+- 修复方案应该是最小化的——只改必要的部分，不要引入不相关的改动。
+- 如果无法确定根因或修复方案，输出 `null` 而不是错误内容。

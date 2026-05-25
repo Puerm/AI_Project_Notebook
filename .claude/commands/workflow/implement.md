@@ -56,3 +56,5 @@ tags: [workflow, implement]
 7. 进入下一阶段
 
 全部阶段结束后，运行 `python harness/scripts/generate_rule_evolution.py` 检查是否有新的重复模式。
+
+**自我升级触发**：最后运行 `python harness/scripts/diagnose_and_fix.py` 进行自我诊断与修复。脚本内部已按 auto/semi-auto/disabled 分流 — auto 级别静默修复后通知用户已自动修复 N 个问题，semi-auto 级别脚本自行暂停等待用户确认，disabled 级别自动跳过。编排器无需读取诊断细节或修复 diff。

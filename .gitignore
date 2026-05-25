@@ -25,3 +25,4 @@ venv/
 # Harness runtime state
 harness/state/feedback-signals.json
 harness/state/current-workflow.json
+harness/state/upgrade-history.json

@@ -1,35 +1,37 @@
 ---
-name: "Workflow: Full Cycle"
-description: 完整开发周期 — PM(主会话交互) → Planner → Explorer → Generator → Reviewer → Tester
-category: Workflow
-tags: [workflow, full-cycle]
+name: "source-command-workflow-implement"
+description: "执行已有计划 — Explorer → Generator → Reviewer → Tester"
 ---
 
-# Full Cycle Workflow
+# source-command-workflow-implement
 
-启动完整开发周期。
+Use this skill when the user asks to run the migrated source command `workflow-implement`.
 
-## 前置
+## Command Template
 
-用户需提供需求主题。若未提供，先询问："你要开发什么功能？（提供 kebab-case 名称，如 add-note-feature）"
+# Implement Workflow
+
+执行已有实现计划。
+
+## 前置检查
+
+用户需提供 topic 名称。若未提供，先询问。确认以下文件存在：
+
+- `openspec/changes/{topic}/plan.md` — 实现计划
+- `openspec/specs/{topic}.md` — spec 文档
+
+若不满足，提示用户先运行 `/workflow:full-cycle <topic>`。
 
 ## 执行
 
-### 阶段 0: PM 讨论（你亲自执行）
+你是轻量编排器。读取 `harness/workflow/implement.md` 的 YAML frontmatter，按 `stages` 逐阶段 spawn 子 Agent。
 
-你阅读 `.claude/agents/pm.md`，扮演 PM 与用户逐项讨论需求。产出 spec 到 `openspec/specs/{topic}.md`。用户确认 spec 后，释放 pm.md 定义，进入编排模式。
+**硬约束：编排模式下不读取 `.Codex/agents/` 和 `openspec/` 下的任何文件。编排器被授权运行 Python 脚本进行状态管理（创建 WorkflowState、记录偏差、追加 FeedbackSignal、运行 generate_rule_evolution.py），这属于编排器职责。**
 
-### 阶段 1-5: 编排模式
+在阶段循环开始前，初始化工作流状态：
+`python -c "from harness.state.workflow_state import WorkflowState; WorkflowState.init('{topic}', ['explorer', 'tester'])"`
 
-读取 `harness/workflow/full-cycle.md` 的 YAML frontmatter，按 `stages` 逐阶段 spawn 子 Agent。
-
-**硬约束：编排模式下不读取 `.claude/agents/` 和 `openspec/` 下的任何文件。编排器被授权运行 Python 脚本进行状态管理（创建 WorkflowState、记录偏差、追加 FeedbackSignal、运行 generate_rule_evolution.py），这属于编排器职责。**
-
-**按此循环执行：**
-
-0. **初始化工作流状态**：若主题名已确定，运行：
-   `python -c "from harness.state.workflow_state import WorkflowState; WorkflowState.init('{topic}', ['explorer', 'tester'])"`
-
+按此循环执行：
 1. 将 inputs/outputs 中的 `{topic}` 替换为确认的主题名
 2. 如果 stage.condition 不满足，跳过该阶段
 3. 调用 `Agent(subagent_type=stage.agent, prompt="任务: {stage.id}\n输入: {inputs}\n输出: {outputs}\n按你 agent 定义中的流程执行。完成后返回 <= 200 字摘要。")`
@@ -57,8 +59,4 @@ tags: [workflow, full-cycle]
 
 7. 进入下一阶段
 
-全部完成后汇总表格。
-
-**收尾**：运行 `python harness/scripts/generate_rule_evolution.py` 检查是否有新的重复模式。
-
-**自我升级触发**：最后运行 `python harness/scripts/diagnose_and_fix.py` 进行自我诊断与修复。脚本内部已按 auto/semi-auto/disabled 分流 — auto 级别静默修复后通知用户已自动修复 N 个问题，semi-auto 级别脚本自行暂停等待用户确认，disabled 级别自动跳过。编排器无需读取诊断细节或修复 diff。
+全部阶段结束后，运行 `python harness/scripts/generate_rule_evolution.py` 检查是否有新的重复模式。

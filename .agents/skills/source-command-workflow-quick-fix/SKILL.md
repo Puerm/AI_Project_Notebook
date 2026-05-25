@@ -1,9 +1,13 @@
 ---
-name: "Workflow: Quick Fix"
-description: 快速修复 — Explorer → Generator → Tester
-category: Workflow
-tags: [workflow, quick-fix]
+name: "source-command-workflow-quick-fix"
+description: "快速修复 — Explorer → Generator → Tester"
 ---
+
+# source-command-workflow-quick-fix
+
+Use this skill when the user asks to run the migrated source command `workflow-quick-fix`.
+
+## Command Template
 
 # Quick Fix Workflow
 
@@ -22,7 +26,7 @@ tags: [workflow, quick-fix]
 
 Quick-fix 不设暂停点，全程自动推进。`{user_input}` 直接传递用户原始问题描述。
 
-**硬约束：编排模式下不读取 `.claude/agents/` 和 `openspec/` 下的任何文件。编排器被授权运行 Python 脚本进行状态管理（创建 WorkflowState、记录偏差、追加 FeedbackSignal、运行 generate_rule_evolution.py），这属于编排器职责。**
+**硬约束：编排模式下不读取 `.Codex/agents/` 和 `openspec/` 下的任何文件。编排器被授权运行 Python 脚本进行状态管理（创建 WorkflowState、记录偏差、追加 FeedbackSignal、运行 generate_rule_evolution.py），这属于编排器职责。**
 
 注意：quick-fix 无 Planner，若 Explorer 发现阻塞问题，编排器直接报告用户并终止。
 
@@ -40,5 +44,3 @@ Quick-fix 不设暂停点，全程自动推进。`{user_input}` 直接传递用�
   - 回环结束后：运行 `python -c "from harness.state.workflow_state import WorkflowState; s = WorkflowState.to_feedback_signal('tester'); from harness.state.feedback_engine import FeedbackEngine; engine = FeedbackEngine(); engine.add_signal(s); engine.save_signals()"` 将回环记录写入反馈信号
 
 全部阶段结束后，运行 `python harness/scripts/generate_rule_evolution.py` 检查是否有新的重复模式。
-
-**自我升级触发**：最后运行 `python harness/scripts/diagnose_and_fix.py` 进行自我诊断与修复。脚本内部已按 auto/semi-auto/disabled 分流 — auto 级别静默修复后通知用户已自动修复 N 个问题，semi-auto 级别脚本自行暂停等待用户确认，disabled 级别自动跳过。编排器无需读取诊断细节或修复 diff。

@@ -168,3 +168,32 @@ target_path/
     }
 }
 ```
+
+---
+
+## 自我升级数据流
+
+```
+feedback-signals.json
+    │
+    ├── FeedbackEngine.detect_patterns() → 重复模式 (occurrences >= 3)
+    │
+    ├── self-upgrade.yaml → 自动程度判定 + 安全边界
+    │
+    ├── upgrade-history.json → 24h 去重检查
+    │
+    ├── LLM 诊断（宽上下文）
+    │   ├── 目标文件内容
+    │   ├── funnel 关联文件（agent↔workflow 引用链、规则交叉引用）
+    │   └── 历史反馈信号
+    │
+    ├── 修复方案（JSON）
+    │   ├── 安全边界通过 + auto → git worktree 沙盒验证
+    │   │   ├── check_structure.py 通过
+    │   │   ├── pytest 通过
+    │   │   ├── agent YAML 有效 → 合并到主分支 + 升级历史
+    │   │   └── 任一失败 → 丢弃沙盒 + 降级输出
+    │   └── 安全边界不通过 / semi-auto 拒绝 → rule-evolution-proposal.md
+    │
+    └── upgrade-history.json（每次修复记录）
+```

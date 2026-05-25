@@ -57,19 +57,52 @@
   3. `generate_data_flow()` 在无 LLM 数据流参数时输出"LLM 未启用"模板，但 analyze_project.py 从未生成 LLM 数据流
   4. `detect_source_root()` 返回了项目根目录而非 `back/python/paper_agent/`，模块只有 back/front 两个
   5. `analyze_overview()` 的技术栈检测只搜根目录，没搜到深层目录里的 pyproject.toml 和 tsconfig.json
-- **解决**: 待 v0.3.2 修复
+- **解决**: v0.3.2 已修复 — analyze_project.py 重构编排流程，新增 enhance_module_descriptions_batch()、enhance_data_flow_llm()、enhance_tech_stack_llm() 三个 LLM 增强函数
 - **关联规则**: Spec 明确要求 LLM 增强模块描述和数据流，Generator 只实现了一部分
+- **状态**: 已修复
 
 ### 2026-05-21 — v0.3 BioTec 输出：directory-map 在深度折叠下仍然包含自身 harness 目录
+
+- **现象**: directory-map 在深度折叠后仍包含 `app/analyzer/` 等 harness 自身目录
+- **触发**: init_project.py 部署后 directory-map 扫描到 harness 自身
+- **根因**: EXCLUDE_DIRS 缺少 `harness`
+- **解决**: 已修复 — v0.3 审查反馈修复中 scanner.py EXCLUDE_DIRS 增加 `harness`
+- **关联规则**: `harness/rules/coding-rules.md`
+- **状态**: 已修复
 
 ### 2026-05-20 16:22 — check_structure.py 用 Notebook 自身结构标准检查目标项目
 
 - **现象**: 对 BioTec（NestJS+React 项目）运行 `check_structure.py`，报告 13 项缺失（`app/`、`data/`、`tests/`、`openspec/`、`.claude/agents/`、`CLAUDE.md` 等），必然 FAIL
 - **触发**: `python harness/scripts/check_structure.py` 在目标项目 BioTec 下执行
 - **根因**: `check_structure.py` 的检查清单硬编码了 AI_Project_Notebook 自身结构。它检查的是"运行它的项目有没有长成 Notebook 的样子"，而不是检查 harness 骨架自身是否完整
-- **解决**: 暂未修复。应改为检查 harness 内部结构完整性（`project-map/` 6 个文件、`rules/`、`scripts/` 等），或支持按项目类型配置检查规则
+- **解决**: 已修复 — `check_structure.py` 的 REQUIRED_DIRS 移除了 `.claude/`、`.claude/agents/`、`.claude/commands/`、`.claude/skills/`，只检查 harness 骨架完整性
 - **关联规则**: `harness/rules/workflow-rules.md` 第 7 条
+- **状态**: 已修复
 
 ---
 
 > 每当遇到错误，在此文件顶部（标题下方）添加一条记录。
+
+---
+
+### 2026-05-25T07:25:58.407383+00:00 — [sandbox_verify_failed] worktree 验证失败 (1 项)
+
+```json
+{
+  "failures": [
+    "pytest 异常: Command '['C:\\\\Python314\\\\python.exe', '-m', 'pytest', 'tests/', '-v']' timed out after 120 seconds"
+  ]
+}
+```
+
+---
+
+### 2026-05-25T07:28:42.157415+00:00 — [sandbox_verify_failed] worktree 验证失败 (1 项)
+
+```json
+{
+  "failures": [
+    "pytest 异常: Command '['C:\\\\Python314\\\\python.exe', '-m', 'pytest', 'tests/', '-v']' timed out after 120 seconds"
+  ]
+}
+```
