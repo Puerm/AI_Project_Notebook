@@ -123,11 +123,12 @@ class TestArchitectureLLM:
         from app.analyzer.dimension_analyzer import analyze_architecture
         tmp = _make_tmpdir()
         try:
+            filtered = [{"path": "src/main.py", "content": "print('hello')"}]
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
                            return_value="## 架构分层\n\n这是测试的架构分析输出。"):
-                    result = analyze_architecture("code text", "TestProject", tmp, enable_dotenv=False)
+                    result = analyze_architecture(filtered, "TestProject", tmp, enable_dotenv=False)
             assert result["status"] == "llm"
             assert os.path.isfile(result["file_path"])
             with open(result["file_path"], "r", encoding="utf-8") as f:
@@ -141,11 +142,12 @@ class TestArchitectureLLM:
         from app.analyzer.dimension_analyzer import analyze_architecture
         tmp = _make_tmpdir()
         try:
+            filtered = [{"path": "src/main.py", "content": "print('hello')"}]
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
                            return_value=None):
-                    result = analyze_architecture("code", "TestProject", tmp, enable_dotenv=False)
+                    result = analyze_architecture(filtered, "TestProject", tmp, enable_dotenv=False)
             assert result["status"] == "degraded"
             assert "降级" in result["content"]
         finally:
@@ -159,11 +161,12 @@ class TestUserStoriesLLM:
         from app.analyzer.dimension_analyzer import analyze_user_stories
         tmp = _make_tmpdir()
         try:
+            filtered = [{"path": "src/main.py", "content": "print('hello')"}]
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
                            return_value="## 核心用户故事\n\n- 作为用户，我想登录。"):
-                    result = analyze_user_stories("code", "arch text", "TestProject", tmp, enable_dotenv=False)
+                    result = analyze_user_stories(filtered, "arch text", "TestProject", tmp, enable_dotenv=False)
             assert result["status"] == "llm"
             assert os.path.isfile(result["file_path"])
             with open(result["file_path"], "r", encoding="utf-8") as f:
@@ -177,11 +180,12 @@ class TestUserStoriesLLM:
         from app.analyzer.dimension_analyzer import analyze_user_stories
         tmp = _make_tmpdir()
         try:
+            filtered = [{"path": "src/main.py", "content": "print('hello')"}]
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
                            return_value=None):
-                    result = analyze_user_stories("code", "arch", "TestProject", tmp, enable_dotenv=False)
+                    result = analyze_user_stories(filtered, "arch", "TestProject", tmp, enable_dotenv=False)
             assert result["status"] == "degraded"
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
@@ -194,11 +198,12 @@ class TestRiskLLM:
         from app.analyzer.dimension_analyzer import analyze_risk
         tmp = _make_tmpdir()
         try:
+            filtered = [{"path": "src/main.py", "content": "print('hello')"}]
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
                            return_value="## 安全风险\n\n- 高风险：硬编码密钥。"):
-                    result = analyze_risk("code", "arch", "stories", "TestProject", tmp, enable_dotenv=False)
+                    result = analyze_risk(filtered, "arch", "stories", "TestProject", tmp, enable_dotenv=False)
             assert result["status"] == "llm"
             assert os.path.isfile(result["file_path"])
             with open(result["file_path"], "r", encoding="utf-8") as f:
@@ -213,11 +218,12 @@ class TestRiskLLM:
         from app.analyzer.dimension_analyzer import analyze_risk
         tmp = _make_tmpdir()
         try:
+            filtered = [{"path": "src/main.py", "content": "print('hello')"}]
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
                            return_value=None):
-                    result = analyze_risk("code", "arch", "stories", "TestProject", tmp, enable_dotenv=False)
+                    result = analyze_risk(filtered, "arch", "stories", "TestProject", tmp, enable_dotenv=False)
             assert result["status"] == "degraded"
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
@@ -275,5 +281,141 @@ class TestWriteAnalysisFile:
             file_path = _write_analysis_file(tmp, "architecture.md", "# Test")
             expected = os.path.join(tmp, "analysis", "architecture.md")
             assert file_path == expected
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ===========================================================================
+# TST-3 新增: 聚焦分析签名验证 + filtered_files 降级测试
+# ===========================================================================
+
+
+class TestDimensionAnalyzerSignatures:
+    """v0.5.1 公开函数签名：第一参数为 filtered_files 而非 digest_text"""
+
+    def test_architecture_first_param_is_filtered_files(self):
+        import inspect
+        from app.analyzer.dimension_analyzer import analyze_architecture
+        sig = inspect.signature(analyze_architecture)
+        params = list(sig.parameters.keys())
+        assert "filtered_files" in params, (
+            f"Expected 'filtered_files' in signature, got {params}"
+        )
+        assert "digest_text" not in params, (
+            f"'digest_text' should be removed from signature, got {params}"
+        )
+
+    def test_user_stories_first_param_is_filtered_files(self):
+        import inspect
+        from app.analyzer.dimension_analyzer import analyze_user_stories
+        sig = inspect.signature(analyze_user_stories)
+        params = list(sig.parameters.keys())
+        assert "filtered_files" in params, (
+            f"Expected 'filtered_files' in signature, got {params}"
+        )
+        assert "digest_text" not in params, (
+            f"'digest_text' should be removed from signature, got {params}"
+        )
+
+    def test_risk_first_param_is_filtered_files(self):
+        import inspect
+        from app.analyzer.dimension_analyzer import analyze_risk
+        sig = inspect.signature(analyze_risk)
+        params = list(sig.parameters.keys())
+        assert "filtered_files" in params, (
+            f"Expected 'filtered_files' in signature, got {params}"
+        )
+        assert "digest_text" not in params, (
+            f"'digest_text' should be removed from signature, got {params}"
+        )
+
+
+class TestDimensionAnalyzerDegradedWithFilteredFiles:
+    """聚焦分析降级模式：传入 filtered_files 列表正常降级，不崩溃"""
+
+    def test_architecture_degraded_with_empty_filtered(self):
+        from app.analyzer.dimension_analyzer import analyze_architecture
+        tmp = _make_tmpdir()
+        try:
+            with patch("app.analyzer.dimension_analyzer._check_llm_available",
+                       return_value=(False, {"api_key": None})):
+                result = analyze_architecture([], "Proj", tmp, enable_dotenv=False)
+            assert result["status"] == "degraded"
+            assert "降级" in result["content"]
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_user_stories_degraded_with_empty_filtered(self):
+        from app.analyzer.dimension_analyzer import analyze_user_stories
+        tmp = _make_tmpdir()
+        try:
+            with patch("app.analyzer.dimension_analyzer._check_llm_available",
+                       return_value=(False, {"api_key": None})):
+                result = analyze_user_stories([], "arch", "Proj", tmp, enable_dotenv=False)
+            assert result["status"] == "degraded"
+            assert "降级" in result["content"]
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_risk_degraded_with_empty_filtered(self):
+        from app.analyzer.dimension_analyzer import analyze_risk
+        tmp = _make_tmpdir()
+        try:
+            with patch("app.analyzer.dimension_analyzer._check_llm_available",
+                       return_value=(False, {"api_key": None})):
+                result = analyze_risk([], "arch", "stories", "Proj", tmp, enable_dotenv=False)
+            assert result["status"] == "degraded"
+            assert "降级" in result["content"]
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_architecture_with_fake_key_using_files_list(self):
+        """假 Key + filtered_files 列表：LLM 调用失败回退到降级，不崩溃"""
+        from app.analyzer.dimension_analyzer import analyze_architecture
+        tmp = _make_tmpdir()
+        try:
+            filtered = [
+                {"path": "src/main.py", "content": "print('hello')"},
+                {"path": "config.json", "content": "{}"},
+            ]
+            with patch("app.analyzer.dimension_analyzer._check_llm_available",
+                       return_value=(True, _mock_llm_config())):
+                with patch("app.analyzer.dimension_analyzer._call_llm",
+                           return_value=None):
+                    result = analyze_architecture(filtered, "Proj", tmp, enable_dotenv=False)
+            assert result["status"] == "degraded"
+            assert os.path.isfile(result["file_path"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_user_stories_with_fake_key_using_files_list(self):
+        """假 Key + filtered_files 列表：LLM 调用失败回退到降级，不崩溃"""
+        from app.analyzer.dimension_analyzer import analyze_user_stories
+        tmp = _make_tmpdir()
+        try:
+            filtered = [{"path": "README.md", "content": "# Project"}]
+            with patch("app.analyzer.dimension_analyzer._check_llm_available",
+                       return_value=(True, _mock_llm_config())):
+                with patch("app.analyzer.dimension_analyzer._call_llm",
+                           return_value=None):
+                    result = analyze_user_stories(filtered, "arch", "Proj", tmp, enable_dotenv=False)
+            assert result["status"] == "degraded"
+            assert os.path.isfile(result["file_path"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_risk_with_fake_key_using_files_list(self):
+        """假 Key + filtered_files 列表：LLM 调用失败回退到降级，不崩溃"""
+        from app.analyzer.dimension_analyzer import analyze_risk
+        tmp = _make_tmpdir()
+        try:
+            filtered = [{"path": "requirements.txt", "content": "flask==2.0"}]
+            with patch("app.analyzer.dimension_analyzer._check_llm_available",
+                       return_value=(True, _mock_llm_config())):
+                with patch("app.analyzer.dimension_analyzer._call_llm",
+                           return_value=None):
+                    result = analyze_risk(filtered, "arch", "stories", "Proj", tmp, enable_dotenv=False)
+            assert result["status"] == "degraded"
+            assert os.path.isfile(result["file_path"])
         finally:
             shutil.rmtree(tmp, ignore_errors=True)

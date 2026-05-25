@@ -4,6 +4,21 @@
 
 ## 变更记录
 
+### 2026-05-22: v0.5.1 修复 LLM 全量分析失焦问题 — 聚焦分析替代全量 dump
+
+- **类型**: 修复
+- **范围**: 4 个新建文件 + 3 个修改应用文件 + 7 个文档更新
+- **摘要**: 修复 v0.5 --digest 模式下全量文件统一 dump 导致 LLM 失去焦点的问题，改为每维度筛选文件子集 + 官方 prompt 模板
+  - **IMP-1**: `domain_analyzer.py` — 业务板块识别支持两级结构（主板块+子板块），不确定信息标注 [推测]，`_normalize_result` 补齐 `sub_domains` 默认值
+  - **IMP-2**: 新建 `app/analyzer/prompts/` 目录 — `__init__.py` (load_prompt 加载器) + 三个官方 prompt 模板 (`architecture.txt`, `user_stories.txt`, `risk.txt`)，每个模板 >200 字符
+  - **IMP-3**: `digest_collector.py` — 新增 `filter_for_architecture/filter_for_user_stories/filter_for_risk` 三个维度筛选函数（基于启发式正则），新增 `format_files_for_llm` 函数，`collect_digest` 不再格式化全量 LLM 文本（返回 `files` 字段替代 `text`）
+  - **IMP-4**: `dimension_analyzer.py` — 重构为聚焦分析：`analyze_architecture/analyze_user_stories/analyze_risk` 接收 `filtered_files` 替代 `digest_text`，`_build_*_prompt` 改为 `_build_*_prompt_from_files` 使用 `load_prompt` 加载官方模板，移除全量 dump 路径
+  - **IMP-5**: `analyze_project.py` — digest 模式从 6 步改为 7 步新流程：引导文件概览 → 两级板块识别 → 概览输出 → digest 文件池收集 → 三维度聚焦分析（每维度传入筛选子集+官方 prompt），非 digest 模式行为不变
+  - **IMP-6**: 版本号 0.5.0 → 0.5.1，README/help.py/command-map/module-map/directory-map/data-flow 同步更新
+  - **IMP-7**: change-map 登记本次变更
+- **影响文件**: `domain_analyzer.py` (修改), `prompts/__init__.py` (新), `prompts/architecture.txt` (新), `prompts/user_stories.txt` (新), `prompts/risk.txt` (新), `digest_collector.py` (修改), `dimension_analyzer.py` (修改), `analyze_project.py` (修改), `__init__.py` (修改), `help.py` (修改), `module-map.md`, `directory-map.md`, `data-flow.md`, `command-map.md`, `README.md`
+- **验证**: `python harness/scripts/check_structure.py` 通过 (46/46)
+
 ### 2026-05-22: v0.1.5 集成 Codebase Digest — 全量文件收集 + LLM 三维度分析
 
 - **类型**: 新功能

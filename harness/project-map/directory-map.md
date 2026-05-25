@@ -6,6 +6,11 @@
     AI_Project_Notebook/
     ├── app/
     │   └── analyzer/  # Python 源码
+    │       ├── prompts/  # 官方 prompt 模板
+    │       │   ├── __init__.py
+    │       │   ├── architecture.txt
+    │       │   ├── user_stories.txt
+    │       │   └── risk.txt
     │       ├── __init__.py
     │       ├── digest_collector.py
     │       ├── dimension_analyzer.py

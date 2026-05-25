@@ -1012,3 +1012,146 @@ class TestCLIIntegration:
             for k, v in saved.items():
                 os.environ[k] = v
             shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ===========================================================================
+# TST-4: CLI digest 聚焦分析新流程端到端测试
+# ===========================================================================
+
+
+class TestDigestCLIE2E:
+    """analyze_project.py --digest 聚焦分析新流程"""
+
+    def test_digest_help_contains_focus_description(self):
+        """--digest --help 输出含'聚焦'描述"""
+        result = _run_cli("--digest", "--help")
+        assert result.returncode == 0
+        assert "聚焦" in result.stdout, (
+            f"Expected '聚焦' in digest help, got: {result.stdout[:500]}"
+        )
+
+    def test_digest_always_generates_project_overview(self):
+        """--digest 模式下即使 cdigest 不可用，仍生成 project-overview.md"""
+        saved = {}
+        for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE", "LLM_MODEL"):
+            if k in os.environ:
+                saved[k] = os.environ.pop(k)
+
+        run_env = _SUBPROCESS_ENV.copy()
+        run_env["LLM_API_KEY"] = "fake-test-key"
+        run_env["LLM_API_BASE"] = "http://127.0.0.1:1"
+
+        tmp = _make_tmpdir()
+        try:
+            _write_file(tmp, "README.md", "# Digest Overview Test\n")
+            os.makedirs(os.path.join(tmp, "src"), exist_ok=True)
+            _write_file(tmp, "src/app.py", "print('hello')\n")
+
+            result = subprocess.run(
+                [sys.executable, CLI_SCRIPT, tmp, "--digest", "--quiet"],
+                capture_output=True, encoding="utf-8", env=run_env,
+            )
+            assert result.returncode == 0, (
+                f"Exit {result.returncode}, stderr: {result.stderr}"
+            )
+
+            overview_path = os.path.join(tmp, "harness", "project-map",
+                                          "project-overview.md")
+            assert os.path.isfile(overview_path), (
+                f"project-overview.md missing at {overview_path}"
+            )
+
+            with open(overview_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            assert "业务板块" in content or "项目定位" in content, (
+                "project-overview.md should have structured content"
+            )
+        finally:
+            for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE",
+                      "LLM_MODEL"):
+                os.environ.pop(k, None)
+            for k, v in saved.items():
+                os.environ[k] = v
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_digest_with_cdigest_available_generates_analysis_files(self):
+        """--digest 模式下若 cdigest 可用，生成 analysis/ 下三份报告"""
+        from app.analyzer.digest_collector import is_cdigest_available
+        if not is_cdigest_available():
+            import pytest
+            pytest.skip("codebase-digest not installed — skipping analysis file test")
+
+        saved = {}
+        for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE", "LLM_MODEL"):
+            if k in os.environ:
+                saved[k] = os.environ.pop(k)
+
+        run_env = _SUBPROCESS_ENV.copy()
+        run_env["LLM_API_KEY"] = "fake-test-key"
+        run_env["LLM_API_BASE"] = "http://127.0.0.1:1"
+
+        tmp = _make_tmpdir()
+        try:
+            _write_file(tmp, "README.md", "# Analysis Test\n")
+            os.makedirs(os.path.join(tmp, "src"), exist_ok=True)
+            _write_file(tmp, "src/main.py", "print('hello')\n")
+
+            result = subprocess.run(
+                [sys.executable, CLI_SCRIPT, tmp, "--digest", "--quiet"],
+                capture_output=True, encoding="utf-8", env=run_env,
+            )
+            assert result.returncode == 0, (
+                f"Exit {result.returncode}, stderr: {result.stderr}"
+            )
+
+            analysis_dir = os.path.join(tmp, "analysis")
+            assert os.path.isfile(os.path.join(analysis_dir, "architecture.md")), (
+                "architecture.md missing"
+            )
+            assert os.path.isfile(os.path.join(analysis_dir, "user-stories.md")), (
+                "user-stories.md missing"
+            )
+            assert os.path.isfile(os.path.join(analysis_dir, "risk-analysis.md")), (
+                "risk-analysis.md missing"
+            )
+        finally:
+            for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE",
+                      "LLM_MODEL"):
+                os.environ.pop(k, None)
+            for k, v in saved.items():
+                os.environ[k] = v
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_non_digest_mode_still_works_regression(self):
+        """非 digest 模式：--quiet 正常输出 project-overview.md（回归）"""
+        saved = {}
+        for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE", "LLM_MODEL"):
+            if k in os.environ:
+                saved[k] = os.environ.pop(k)
+
+        run_env = _SUBPROCESS_ENV.copy()
+        run_env["LLM_API_KEY"] = "fake-test-key"
+        run_env["LLM_API_BASE"] = "http://127.0.0.1:1"
+
+        tmp = _make_tmpdir()
+        try:
+            _write_file(tmp, "main.py", "print('hello')\n")
+            result = subprocess.run(
+                [sys.executable, CLI_SCRIPT, tmp, "--quiet"],
+                capture_output=True, encoding="utf-8", env=run_env,
+            )
+            assert result.returncode == 0, (
+                f"Exit {result.returncode}, stderr: {result.stderr}"
+            )
+            overview_path = os.path.join(tmp, "harness", "project-map",
+                                          "project-overview.md")
+            assert os.path.isfile(overview_path), (
+                f"project-overview.md missing at {overview_path}"
+            )
+        finally:
+            for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE",
+                      "LLM_MODEL"):
+                os.environ.pop(k, None)
+            for k, v in saved.items():
+                os.environ[k] = v
+            shutil.rmtree(tmp, ignore_errors=True)

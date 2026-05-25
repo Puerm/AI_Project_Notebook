@@ -24,7 +24,7 @@ target_path/
 
 ## 数据结构
 
-### domain_result (domain_analyzer.py 输出)
+### domain_result (domain_analyzer.py 输出，v0.5.1 支持两级结构)
 
 ```json
 {
@@ -35,15 +35,17 @@ target_path/
         "description": "string (≤60字)",
         "evidence": "string",
         "paths": ["string", ...],
-        "confidence": "高 | 中 | 低"
+        "confidence": "高 | 中 | 低",
+        "sub_domains": [{
+            "name": "string (≤10字)",
+            "description": "string (≤40字)",
+            "evidence": "string",
+            "paths": ["string", ...],
+            "confidence": "高 | 中 | 低"
+        }]
     }],
-    "relationships": [{
-        "from": "string",
-        "to": "string",
-        "type": "依赖 | 调用 | 数据流 | 配置",
-        "evidence": "string"
-    }],
-    "next_steps": ["string", "string", "string"],
+    "relationships": [...],
+    "next_steps": [...],
     "source": "llm | degraded"
 }
 ```
@@ -55,35 +57,49 @@ target_path/
 
 ---
 
-## Digest 分析流水线 (v0.5 新增)
+## Digest 分析流水线 (v0.5.1 聚焦分析)
 
 ```
 target_path/
     │
-    ├── [Step D1] digest_collector.py
-    │   ├── is_cdigest_available() → 检查 codebase-digest 包是否可用
-    │   ├── run_digest_collection() → 调用 analyze_directory() 收集全量文件
-    │   │   └── 降级: 回退到引导文件模式
-    │   ├── preprocess_digest() → 过滤 [Non-text file]、折叠编译产物目录
-    │   └── format_digest_for_llm() → 格式化为 LLM 可消费文本
+    ├── [Step digest/1] guiding_files.py (引导文件概览)
+    │   ├── collect_guiding_files() → 引导文件内容 (found/missing)
+    │   └── generate_directory_summary() → 目录结构摘要 (≤30行)
     │
-    ├── [Step D2] domain_analyzer.py + map_writer.py (保持不变)
-    │   ├── analyze_business_domains() → LLM 业务板块识别
+    ├── [Step digest/2] domain_analyzer.py (两级：主板块+子板块)
+    │   ├── _build_domain_analysis_prompt() → LLM prompt (含 sub_domains 结构)
+    │   ├── _call_llm() → LLM 响应
+    │   └── _parse_domain_response() → 结构化 domain_result (含 sub_domains 默认值)
+    │       └── 降级: _degraded_domain_result()
+    │
+    ├── [Step digest/3] map_writer.py
     │   └── generate_progressive_overview() → project-overview.md
     │
-    ├── [Step D3] dimension_analyzer.py — LLM 三维度分析
-    │   ├── analyze_architecture(digest_text) → analysis/architecture.md
-    │   │   └── 降级: _degraded_architecture()
-    │   ├── analyze_user_stories(digest_text, arch_content) → analysis/user-stories.md
-    │   │   └── 降级: _degraded_user_stories()
-    │   └── analyze_risk(digest_text, arch_content, stories_content) → analysis/risk-analysis.md
-    │       └── 降级: _degraded_risk()
+    ├── [Step digest/4] digest_collector.py (文件池收集，不格式化 LLM 文本)
+    │   ├── is_cdigest_available() → 检查 codebase-digest
+    │   ├── run_digest_collection() → 全量文件收集
+    │   ├── preprocess_digest() → 噪声过滤
+    │   └── collect_digest() → {files: [...], status: "ok"} (不再返回 text 字段)
+    │
+    ├── [Step digest/5-7] dimension_analyzer.py — 聚焦三维度分析
+    │   ├── filter_for_architecture(files) → 架构相关文件子集
+    │   │   └── analyze_architecture(filtered_files) → analysis/architecture.md
+    │   │       ├── _build_architecture_prompt_from_files() → 使用 load_prompt("architecture")
+    │   │       └── 降级: _degraded_architecture()
+    │   ├── filter_for_user_stories(files) → 用户故事相关文件子集
+    │   │   └── analyze_user_stories(filtered_files, arch_content) → analysis/user-stories.md
+    │   │       ├── _build_stories_prompt_from_files() → 使用 load_prompt("user_stories")
+    │   │       └── 降级: _degraded_user_stories()
+    │   └── filter_for_risk(files) → 风险相关文件子集
+    │       └── analyze_risk(filtered_files, arch_content, stories_content) → analysis/risk-analysis.md
+    │           ├── _build_risk_prompt_from_files() → 使用 load_prompt("risk")
+    │           └── 降级: _degraded_risk()
     │
     └── 输出 (4 个文件):
         ├── harness/project-map/project-overview.md  (现有)
-        ├── analysis/architecture.md                  (新增)
-        ├── analysis/user-stories.md                  (新增)
-        └── analysis/risk-analysis.md                 (新增)
+        ├── analysis/architecture.md                  (聚焦)
+        ├── analysis/user-stories.md                  (聚焦)
+        └── analysis/risk-analysis.md                 (聚焦)
 ```
 
 ### dimension_analyzer 返回值
@@ -96,11 +112,12 @@ target_path/
 }
 ```
 
-### digest_collector 返回值
+### digest_collector 返回值 (v0.5.1)
 
 ```json
 {
-    "text": "格式化后的全量文件文本",
+    "text": "",
+    "files": [{"path": "...", "content": "..."}, ...],
     "status": "ok | cdigest_unavailable | error",
     "stats": {
         "files": 91,

@@ -11,7 +11,7 @@
 | `python harness/scripts/check_structure.py` | 检查项目结构完整性 | `harness/scripts/check_structure.py` |
 | `python harness/scripts/search_notes.py <关键词>` | 搜索笔记 | `harness/scripts/search_notes.py` |
 | `python harness/scripts/export_report.py` | 导出项目理解报告 | `harness/scripts/export_report.py` |
-| `python harness/scripts/analyze_project.py <目标路径>` | 智能项目分析引擎 (v0.5: 渐进式披露 / --digest 全量三维分析) [--digest] [--max-size N] | `harness/scripts/analyze_project.py` |
+| `python harness/scripts/analyze_project.py <目标路径>` | 智能项目分析引擎 (v0.5.1: 渐进式披露 / --digest 聚焦三维度分析) [--digest] [--max-size N] | `harness/scripts/analyze_project.py` |
 
 ## Claude Code 命令
 

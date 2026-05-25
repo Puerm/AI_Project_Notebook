@@ -31,8 +31,9 @@ def analyze_business_domains(guiding_files_result, dir_summary, project_name,
             "你是一位资深软件架构师，擅长从代码仓库中识别用户可见的业务功能模块。"
             "你的分析基于引导文件（README、依赖清单、CI配置）和目录结构摘要。"
             "业务板块是用户视角的功能领域，不是代码目录名。"
+            "识别主板块（一级，5-15个）和子板块（二级，每个主板块0-5个），子板块必须归属到主板块下。"
             "必须注明每条信息的来源（哪个文件/目录）。禁止凭空编造。"
-            "不确定时标注低置信度。板块数量控制在 5-20 个。"
+            "不确定的信息在 description 中标注 [推测] 前缀。板块数量控制在 5-20 个。"
             "只返回 JSON，不要任何额外文字。"
         ),
         user_prompt=prompt,
@@ -88,7 +89,16 @@ def _build_domain_analysis_prompt(guiding_files_result, dir_summary, project_nam
       "description": "板块功能描述（≤60字）",
       "evidence": "判断依据：来源文件和关键内容",
       "paths": ["关联目录路径1", "关联目录路径2"],
-      "confidence": "高" | "中" | "低"
+      "confidence": "高" | "中" | "低",
+      "sub_domains": [
+        {
+          "name": "子板块简称（≤10字中文）",
+          "description": "子板块描述（≤40字）",
+          "evidence": "判断依据",
+          "paths": ["关联目录路径"],
+          "confidence": "高" | "中" | "低"
+        }
+      ]
     }
   ],
   "relationships": [
@@ -110,8 +120,9 @@ def _build_domain_analysis_prompt(guiding_files_result, dir_summary, project_nam
 - 业务板块是用户视角的功能领域，不是代码目录名
 - 每个板块必须注明 evidence（来源）
 - 禁止凭空编造不存在的功能
-- 板块数量 5-20 个
-- 不确定时标低置信度
+- 主板块数量 5-15 个（一级），每个主板块可有 0-5 个子板块（二级）
+- 子板块必须归属到一个主板块下，是主板块的细分功能
+- 不确定时在 description 中标注 [推测]
 - 每个板块的 paths 必须是实际存在的目录路径
 - next_steps 是给开发者的分析建议，不是代码修改建议
 """)
@@ -154,7 +165,7 @@ def _parse_domain_response(text):
 
 
 def _normalize_result(result):
-    """确保返回结果包含所有必需字段。"""
+    """确保返回结果包含所有必需字段，每个 domain 补齐 sub_domains 默认值。"""
     defaults = {
         "one_liner": "",
         "tech_stack": [],
@@ -165,6 +176,9 @@ def _normalize_result(result):
     for key, default in defaults.items():
         if key not in result:
             result[key] = default
+    for domain in result.get("domains", []):
+        if "sub_domains" not in domain:
+            domain["sub_domains"] = []
     return result
 
 
@@ -180,6 +194,7 @@ def _degraded_domain_result(project_name):
                 "evidence": "降级分析",
                 "paths": ["."],
                 "confidence": "低",
+                "sub_domains": [],
             }
         ],
         "relationships": [],

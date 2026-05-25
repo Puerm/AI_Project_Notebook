@@ -1,8 +1,9 @@
-# analyze_project.py — 智能项目分析引擎 v0.5 渐进式披露 + digest 全量三维分析
+# analyze_project.py — 智能项目分析引擎 v0.5.1 渐进式披露 + digest 聚焦三维度分析
 
 import argparse
 import os
 import sys
+import time
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 HARNESS_ROOT = os.path.dirname(SCRIPT_DIR)
@@ -19,7 +20,7 @@ from app.analyzer.llm_assistant import check_api_key_available
 
 def main():
     parser = argparse.ArgumentParser(
-        description="智能项目分析引擎 v0.5 — 渐进式披露 + --digest 全量文件三维度分析",
+        description="智能项目分析引擎 v0.5.1 — 渐进式披露 + --digest 聚焦三维度分析",
         epilog=(
             "环境变量 (LLM 必需):\n"
             "  ANTHROPIC_API_KEY   Anthropic API Key\n"
@@ -44,7 +45,7 @@ def main():
     )
     parser.add_argument(
         "--digest", action="store_true", default=False,
-        help="启用 codebase-digest 全量文件收集 + LLM 三维度分析 (架构/用户故事/风险)"
+        help="启用聚焦三维度分析 (架构/用户故事/风险)，每维度仅传入相关文件子集"
     )
     parser.add_argument(
         "--max-size", type=int, default=10240,
@@ -78,44 +79,35 @@ def main():
 
     # ── Digest 模式 ──
     if args.digest:
-        from app.analyzer.digest_collector import collect_digest
+        from app.analyzer.digest_collector import (
+            collect_digest,
+            filter_for_architecture,
+            filter_for_user_stories,
+            filter_for_risk,
+        )
         from app.analyzer.dimension_analyzer import (
             analyze_architecture, analyze_user_stories, analyze_risk,
         )
 
-        # Step D1: Digest collection
+        # [digest/1] Guiding file overview (same as non-digest Step 1)
         if not args.quiet:
-            print("[digest/1] 收集全量文件...")
-        digest_result = collect_digest(target_path, max_size_kb=args.max_size)
-        if digest_result["status"] == "ok":
-            digest_text = digest_result["text"]
-            if not args.quiet:
-                print(f"  收集到 {digest_result['stats']['files']} 个文件, "
-                      f"{len(digest_text)} 字符")
-        elif digest_result["status"] == "cdigest_unavailable":
-            print("警告: codebase-digest 未安装，回退到引导文件模式。", file=sys.stderr)
-            print("  安装: pip install codebase-digest", file=sys.stderr)
-            digest_text = None
-        else:
-            print(f"警告: digest 收集失败 ({digest_result.get('error', 'unknown')})，"
-                  "回退到引导文件模式。", file=sys.stderr)
-            digest_text = None
-
-        # Step D2: Business domain analysis (always run, same as non-digest)
-        if not args.quiet:
-            print("[digest/2] 业务板块识别...")
+            print("[digest/1] 收集引导文件...")
         try:
             guiding_result = collect_guiding_files(target_path)
         except Exception as e:
-            print(f"[digest/2] 引导文件收集失败: {type(e).__name__}: {e}", file=sys.stderr)
+            print(f"[digest/1] 引导文件收集失败: {type(e).__name__}: {e}", file=sys.stderr)
             guiding_result = {"found": [], "missing": []}
-
         try:
             dir_summary = generate_directory_summary(target_path)
         except Exception as e:
-            print(f"[digest/2] 目录摘要生成失败: {type(e).__name__}: {e}", file=sys.stderr)
+            print(f"[digest/1] 目录摘要生成失败: {type(e).__name__}: {e}", file=sys.stderr)
             dir_summary = f"项目根: {project_name}\n(目录摘要生成失败)"
+        if not args.quiet:
+            print(f"  收集到 {len(guiding_result['found'])} 个引导文件")
 
+        # [digest/2] Business domain analysis (now with two-level structure)
+        if not args.quiet:
+            print("[digest/2] 业务板块识别（两级：主板块 + 子板块）...")
         try:
             domain_result = analyze_business_domains(
                 guiding_result, dir_summary, project_name,
@@ -124,12 +116,11 @@ def main():
         except Exception as e:
             print(f"[digest/2] 板块识别失败: {type(e).__name__}: {e}", file=sys.stderr)
             sys.exit(1)
-
         if not args.quiet:
             domains_count = len(domain_result.get("domains", []))
             print(f"  识别到 {domains_count} 个业务板块")
 
-        # Step D3: Generate project-overview.md
+        # [digest/3] Generate project-overview.md
         if not args.quiet:
             print("[digest/3] 生成项目概览...")
         try:
@@ -142,33 +133,65 @@ def main():
             print(f"[digest/3] 文件生成失败: {type(e).__name__}: {e}", file=sys.stderr)
             sys.exit(1)
 
-        # Step D4-D6: Three-dimension analysis (only if digest succeeded)
-        if digest_text:
-            # D4: Architecture analysis
+        # [digest/4] Digest file pool collection (collect files only, no LLM text)
+        if not args.quiet:
+            print("[digest/4] digest 文件池收集...")
+        digest_result = collect_digest(target_path, max_size_kb=args.max_size)
+        if digest_result["status"] == "ok":
+            digest_files = digest_result["files"]
             if not args.quiet:
-                print("[digest/4] 架构分析...")
+                print(f"  收集到 {len(digest_files)} 个文件")
+        elif digest_result["status"] == "cdigest_unavailable":
+            print("警告: codebase-digest 未安装，跳过聚焦分析。", file=sys.stderr)
+            print("  安装: pip install codebase-digest", file=sys.stderr)
+            digest_files = None
+        else:
+            print(f"警告: digest 收集失败 ({digest_result.get('error', 'unknown')})，"
+                  "跳过聚焦分析。", file=sys.stderr)
+            digest_files = None
+
+        # Three-dimension focused analysis (only if digest files are available)
+        if digest_files:
+            # [digest/5] Architecture focused analysis
+            if not args.quiet:
+                print("[digest/5] 架构聚焦分析...")
+            arch_filtered = filter_for_architecture(digest_files)
+            if not args.quiet:
+                print(f"  筛选出 {len(arch_filtered)} 个架构相关文件")
             arch_result = analyze_architecture(
-                digest_text, project_name, target_path, enable_dotenv=True,
+                arch_filtered, project_name, target_path, enable_dotenv=True,
             )
             if not args.quiet:
                 print(f"  {arch_result['status']}: {arch_result['file_path']}")
             arch_content = arch_result["content"]
 
-            # D5: User stories analysis
+            # Rate limit avoidance: pause between API calls
+            time.sleep(3)
+
+            # [digest/6] User stories focused analysis
             if not args.quiet:
-                print("[digest/5] 用户故事重建...")
+                print("[digest/6] 用户故事聚焦分析...")
+            stories_filtered = filter_for_user_stories(digest_files)
+            if not args.quiet:
+                print(f"  筛选出 {len(stories_filtered)} 个用户故事相关文件")
             stories_result = analyze_user_stories(
-                digest_text, arch_content, project_name, target_path, enable_dotenv=True,
+                stories_filtered, arch_content, project_name, target_path, enable_dotenv=True,
             )
             if not args.quiet:
                 print(f"  {stories_result['status']}: {stories_result['file_path']}")
             stories_content = stories_result["content"]
 
-            # D6: Risk analysis
+            # Rate limit avoidance: pause between API calls
+            time.sleep(3)
+
+            # [digest/7] Risk focused analysis
             if not args.quiet:
-                print("[digest/6] 风险分析...")
+                print("[digest/7] 风险聚焦分析...")
+            risk_filtered = filter_for_risk(digest_files)
+            if not args.quiet:
+                print(f"  筛选出 {len(risk_filtered)} 个风险相关文件")
             risk_result = analyze_risk(
-                digest_text, arch_content, stories_content,
+                risk_filtered, arch_content, stories_content,
                 project_name, target_path, enable_dotenv=True,
             )
             if not args.quiet:
@@ -177,7 +200,7 @@ def main():
         if not args.quiet:
             print(f"\n分析完成，输出到 {output_dir}")
             print(f"  - project-overview.md")
-            if digest_text:
+            if digest_files:
                 analysis_dir = os.path.join(target_path, "analysis")
                 print(f"  - {analysis_dir}/architecture.md")
                 print(f"  - {analysis_dir}/user-stories.md")

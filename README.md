@@ -6,7 +6,7 @@
 
 ## 版本
 
-**v0.5** — 渐进式披露引擎。收集引导文件 + LLM 识别业务板块，生成单一项目概览文档。支持 `--digest` 全量文件三维度分析（架构/用户故事/风险）。LLM 为必需依赖。
+**v0.5.1** — 渐进式披露引擎。收集引导文件 + LLM 识别业务板块（两级结构），生成单一项目概览文档。支持 `--digest` 聚焦三维度分析（架构/用户故事/风险），每维度仅传入筛选后的文件子集。LLM 为必需依赖。
 
 ## 快速开始
 
@@ -29,7 +29,7 @@ python harness/scripts/export_report.py
 # 渐进式分析项目（LLM 必需）
 python harness/scripts/analyze_project.py <目标路径>
 
-# 全量文件三维度分析（架构/用户故事/风险，需安装 codebase-digest）
+# 聚焦三维度分析（每维度仅传入筛选后的文件子集，需安装 codebase-digest）
 pip install codebase-digest
 python harness/scripts/analyze_project.py <目标路径> --digest
 
@@ -46,7 +46,7 @@ python harness/scripts/init_project.py <目标项目路径>
 # 第二步：分析目标项目（LLM 必需，需先在 Notebook 根目录配置 API Key）
 python harness/scripts/analyze_project.py <目标项目路径>
 
-# 可选：全量文件三维度分析（需先 pip install codebase-digest）
+# 可选：聚焦三维度分析（需先 pip install codebase-digest）
 python harness/scripts/analyze_project.py <目标项目路径> --digest
 ```
 

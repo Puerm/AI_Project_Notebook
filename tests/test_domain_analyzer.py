@@ -127,7 +127,7 @@ class TestDomainAnalyzer:
         assert "tests/" in prompt
 
     def test_prompt_contains_output_format_spec(self):
-        """prompt 包含 JSON 输出格式说明和约束规则"""
+        """prompt 包含 JSON 输出格式说明和约束规则（v0.5.1 含 sub_domains + [推测] 标注）"""
         prompt = _build_domain_analysis_prompt(
             {"found": [], "missing": []}, "根: test", "test"
         )
@@ -136,7 +136,11 @@ class TestDomainAnalyzer:
         assert "relationships" in prompt
         assert "next_steps" in prompt
         assert "约束规则" in prompt
-        assert "5-20" in prompt
+        assert "sub_domains" in prompt
+        assert "主板块" in prompt
+        assert "子板块" in prompt
+        assert "[推测]" in prompt
+        assert "5-15" in prompt
 
     def test_prompt_empty_guiding_files_shows_placeholder(self):
         """无引导文件时 prompt 包含占位文字"""
@@ -289,3 +293,85 @@ class TestDomainAnalyzer:
                 os.environ.pop(k, None)
             for k, v in saved.items():
                 os.environ[k] = v
+
+
+# ===========================================================================
+# TST-2 新增: 两级结构（sub_domains）测试
+# ===========================================================================
+
+
+class TestDomainTwoLevelStructure:
+    """v0.5.1 两级板块结构 — sub_domains 字段"""
+
+    def test_normalize_adds_sub_domains_default(self):
+        """每个 domain 若无 sub_domains 字段则自动补齐 []"""
+        result = _normalize_result({
+            "one_liner": "test",
+            "domains": [
+                {"name": "Core", "description": "核心", "evidence": "e",
+                 "paths": ["src"], "confidence": "高"},
+            ],
+        })
+        for domain in result["domains"]:
+            assert "sub_domains" in domain, f"Missing sub_domains in {domain}"
+            assert domain["sub_domains"] == []
+
+    def test_normalize_preserves_existing_sub_domains(self):
+        """已有 sub_domains 字段不被覆盖"""
+        result = _normalize_result({
+            "one_liner": "test",
+            "domains": [
+                {
+                    "name": "用户系统",
+                    "description": "用户相关功能",
+                    "evidence": "README",
+                    "paths": ["auth"],
+                    "confidence": "高",
+                    "sub_domains": [
+                        {"name": "登录", "description": "认证登录",
+                         "evidence": "readme", "paths": ["auth/login"],
+                         "confidence": "高"},
+                    ],
+                },
+            ],
+        })
+        assert len(result["domains"][0]["sub_domains"]) == 1
+        assert result["domains"][0]["sub_domains"][0]["name"] == "登录"
+
+    def test_degraded_result_has_sub_domains(self):
+        """降级结果中每个 domain 包含 sub_domains 字段"""
+        result = _degraded_domain_result("test")
+        for domain in result["domains"]:
+            assert "sub_domains" in domain
+            assert isinstance(domain["sub_domains"], list)
+
+    def test_parse_json_with_sub_domains(self):
+        """LLM 返回含 sub_domains 的 JSON 正确解析"""
+        valid = json.dumps({
+            "one_liner": "test",
+            "tech_stack": ["Python"],
+            "domains": [
+                {
+                    "name": "核心模块",
+                    "description": "核心功能 [推测]",
+                    "evidence": "README",
+                    "paths": ["core"],
+                    "confidence": "中",
+                    "sub_domains": [
+                        {"name": "数据层", "description": "数据访问",
+                         "evidence": "db.py", "paths": ["core/db"],
+                         "confidence": "高"},
+                    ],
+                },
+            ],
+            "relationships": [],
+            "next_steps": [],
+        })
+        result = _parse_domain_response(valid)
+        assert result is not None
+        assert len(result["domains"]) == 1
+        assert "sub_domains" in result["domains"][0]
+        assert len(result["domains"][0]["sub_domains"]) == 1
+        assert result["domains"][0]["sub_domains"][0]["name"] == "数据层"
+        # [推测] annotation preserved in description
+        assert "[推测]" in result["domains"][0]["description"]

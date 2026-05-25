@@ -1,9 +1,15 @@
-# dimension_analyzer.py — 三维度代码分析引擎（架构/用户故事/风险），含 LLM 增强和降级模式
+# dimension_analyzer.py — 聚焦三维度分析引擎（架构/用户故事/风险），使用官方 prompt + 筛选文件子集
 
 import os
 import sys
+import time
 
 from app.analyzer.llm_assistant import _get_llm_config, _call_llm
+from app.analyzer.prompts import load_prompt
+from app.analyzer.digest_collector import format_files_for_llm
+
+RETRY_MAX = 3
+RETRY_BASE_DELAY = 2
 
 
 def _check_llm_available(enable_dotenv=True):
@@ -24,119 +30,64 @@ def _write_analysis_file(output_dir, filename, content):
     return file_path
 
 
-def _build_architecture_prompt(digest_text, project_name, max_chars=6000):
-    """构造架构分析 LLM prompt。"""
-    truncated = digest_text[:max_chars]
-    if len(digest_text) > max_chars:
-        truncated += "\n\n...(codebase digest truncated, total within limit)"
-
-    return f"""# 项目名称
-{project_name}
-
-# 代码库摘要（codebase-digest 全量文件收集）
-```
-{truncated}
-```
-
-# 输出要求
-请分析该项目的架构分层，输出一份 Markdown 格式的架构分析报告。
-
-报告结构：
-1. **架构风格** — 识别使用的架构模式（如 MVC、微服务、分层架构等）
-2. **分层说明** — 每层的职责、关键目录、主要模块
-3. **技术选型** — 使用的框架、库、中间件
-4. **关键设计决策** — 重要的架构决策点
-5. **改进建议** — 架构层面的改进空间
-
-约束：
-- 只分析能从代码中确认的内容
-- 不确定的部分标注 [推测]
-- 报告用中文编写
-- 输出完整的 Markdown 文档，标题以 # 开始
-"""
+def _build_architecture_prompt_from_files(filtered_files, project_name):
+    """基于筛选后的文件子集构造架构分析用户 prompt。"""
+    files_text = format_files_for_llm(filtered_files)
+    return load_prompt("architecture").format(
+        project_name=project_name,
+        files_content=files_text,
+    )
 
 
-def _build_stories_prompt(digest_text, arch_text, project_name, max_chars=6000):
-    """构造用户故事分析 LLM prompt。"""
-    truncated = digest_text[:max_chars]
-    if len(digest_text) > max_chars:
-        truncated += "\n\n...(truncated)"
-
-    arch_summary = arch_text[:2000] if arch_text else "(架构分析不可用)"
-
-    return f"""# 项目名称
-{project_name}
-
-# 架构分析摘要
-```
-{arch_summary}
-```
-
-# 代码库摘要（codebase-digest 全量文件收集）
-```
-{truncated}
-```
-
-# 输出要求
-请基于代码库和架构分析，反向重建该项目的用户故事。输出一份 Markdown 格式的用户故事文档。
-
-报告结构：
-1. **核心用户故事** — 按优先级排列的用户故事列表（格式：作为 <角色>，我想要 <目标>，以便 <价值>）
-2. **功能模块映射** — 每个故事对应的代码模块路径
-3. **故事依赖关系** — 故事之间的先后顺序和依赖
-4. **技术支持故事** — 非功能性需求对应的故事（性能、安全、可维护性等）
-
-约束：
-- 每个故事必须有代码证据支撑
-- 引用架构分析（architecture.md）作为上下文
-- 不确定的功能标注 [推测]
-- 用中文编写
-"""
+def _build_stories_prompt_from_files(filtered_files, arch_text, project_name):
+    """基于筛选后的文件子集构造用户故事分析用户 prompt。"""
+    files_text = format_files_for_llm(filtered_files)
+    arch_context = arch_text[:2000] if arch_text else "(架构分析不可用)"
+    prompt_template = load_prompt("user_stories")
+    user_prompt = prompt_template.format(
+        project_name=project_name,
+        files_content=files_text,
+    )
+    user_prompt += f"\n\n# 架构分析摘要（作为上下文参考）\n```\n{arch_context}\n```\n"
+    return user_prompt
 
 
-def _build_risk_prompt(digest_text, arch_text, stories_text, project_name, max_chars=6000):
-    """构造风险分析 LLM prompt。"""
-    truncated = digest_text[:max_chars]
-    if len(digest_text) > max_chars:
-        truncated += "\n\n...(truncated)"
-
+def _build_risk_prompt_from_files(filtered_files, arch_text, stories_text, project_name):
+    """基于筛选后的文件子集构造风险分析用户 prompt。"""
+    files_text = format_files_for_llm(filtered_files)
     arch_summary = arch_text[:1500] if arch_text else "(架构分析不可用)"
     stories_summary = stories_text[:1500] if stories_text else "(用户故事分析不可用)"
+    prompt_template = load_prompt("risk")
+    user_prompt = prompt_template.format(
+        project_name=project_name,
+        files_content=files_text,
+    )
+    user_prompt += f"\n\n# 架构分析摘要（作为上下文参考）\n```\n{arch_summary}\n```\n"
+    user_prompt += f"\n# 用户故事分析摘要（作为上下文参考）\n```\n{stories_summary}\n```\n"
+    return user_prompt
 
-    return f"""# 项目名称
-{project_name}
 
-# 架构分析摘要
-```
-{arch_summary}
-```
-
-# 用户故事分析摘要
-```
-{stories_summary}
-```
-
-# 代码库摘要（codebase-digest 全量文件收集）
-```
-{truncated}
-```
-
-# 输出要求
-请分析该项目的潜在错误和风险，输出一份 Markdown 格式的风险分析报告。
-
-报告结构：
-1. **安全风险** — 硬编码密钥、注入风险、权限问题等
-2. **稳定性风险** — 错误处理缺失、资源泄漏、并发问题等
-3. **可维护性风险** — 代码重复、耦合度高、缺少文档等
-4. **技术债务** — 过时依赖、不推荐使用的模式等
-5. **缓解建议** — 具体可行的改进方案
-
-约束：
-- 引用架构分析（architecture.md）和用户故事分析（user-stories.md）作为上下文
-- 只分析代码中能确认的风险
-- 风险按严重程度排序（高/中/低）
-- 用中文编写
-"""
+def _call_llm_with_retry(system_prompt, user_prompt, config, max_tokens=4096, timeout=120):
+    """调用 LLM，失败时自动重试（最多 3 次，指数退避）。"""
+    for attempt in range(1, RETRY_MAX + 1):
+        result = _call_llm(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            config=config,
+            max_tokens=max_tokens,
+            timeout=timeout,
+            silent=True,
+        )
+        if result is not None:
+            if attempt > 1:
+                print(f"  [重试成功] 第 {attempt} 次调用成功", file=sys.stderr)
+            return result
+        if attempt < RETRY_MAX:
+            delay = RETRY_BASE_DELAY ** attempt
+            print(f"  [重试 {attempt}/{RETRY_MAX}] API 调用失败，{delay}s 后重试...", file=sys.stderr)
+            time.sleep(delay)
+    print(f"  [重试耗尽] {RETRY_MAX} 次重试后仍失败，降级处理", file=sys.stderr)
+    return None
 
 
 def _degraded_architecture(project_name):
@@ -237,8 +188,8 @@ def _degraded_risk(project_name):
 """
 
 
-def analyze_architecture(digest_text, project_name, output_dir, enable_dotenv=True):
-    """LLM 架构分层分析，写入 analysis/architecture.md。"""
+def analyze_architecture(filtered_files, project_name, output_dir, enable_dotenv=True):
+    """聚焦架构分析，接收筛选后的文件子集，写入 analysis/architecture.md。"""
     available, config = _check_llm_available(enable_dotenv)
 
     if not available:
@@ -246,10 +197,10 @@ def analyze_architecture(digest_text, project_name, output_dir, enable_dotenv=Tr
         file_path = _write_analysis_file(output_dir, "architecture.md", content)
         return {"file_path": file_path, "status": "degraded", "content": content}
 
-    prompt = _build_architecture_prompt(digest_text, project_name)
-    result = _call_llm(
+    user_prompt = _build_architecture_prompt_from_files(filtered_files, project_name)
+    result = _call_llm_with_retry(
         system_prompt="你是一位资深软件架构师，擅长从代码中识别架构模式并生成结构化的架构分析报告。输出完整的 Markdown 文档。",
-        user_prompt=prompt,
+        user_prompt=user_prompt,
         config=config,
         max_tokens=4096,
         timeout=120,
@@ -265,8 +216,8 @@ def analyze_architecture(digest_text, project_name, output_dir, enable_dotenv=Tr
     return {"file_path": file_path, "status": "llm", "content": full_content}
 
 
-def analyze_user_stories(digest_text, arch_md_text, project_name, output_dir, enable_dotenv=True):
-    """LLM 反向重建用户故事，写入 analysis/user-stories.md。"""
+def analyze_user_stories(filtered_files, arch_md_text, project_name, output_dir, enable_dotenv=True):
+    """聚焦用户故事重建，接收筛选后的文件子集，写入 analysis/user-stories.md。"""
     available, config = _check_llm_available(enable_dotenv)
 
     if not available:
@@ -274,10 +225,10 @@ def analyze_user_stories(digest_text, arch_md_text, project_name, output_dir, en
         file_path = _write_analysis_file(output_dir, "user-stories.md", content)
         return {"file_path": file_path, "status": "degraded", "content": content}
 
-    prompt = _build_stories_prompt(digest_text, arch_md_text, project_name)
-    result = _call_llm(
+    user_prompt = _build_stories_prompt_from_files(filtered_files, arch_md_text, project_name)
+    result = _call_llm_with_retry(
         system_prompt="你是一位资深产品经理，擅长从代码仓库中反向重建用户故事。每个故事必须有代码证据。输出完整的 Markdown 文档。",
-        user_prompt=prompt,
+        user_prompt=user_prompt,
         config=config,
         max_tokens=4096,
         timeout=120,
@@ -293,8 +244,8 @@ def analyze_user_stories(digest_text, arch_md_text, project_name, output_dir, en
     return {"file_path": file_path, "status": "llm", "content": full_content}
 
 
-def analyze_risk(digest_text, arch_md_text, stories_md_text, project_name, output_dir, enable_dotenv=True):
-    """LLM 错误与风险分析，写入 analysis/risk-analysis.md。"""
+def analyze_risk(filtered_files, arch_md_text, stories_md_text, project_name, output_dir, enable_dotenv=True):
+    """聚焦风险分析，接收筛选后的文件子集，写入 analysis/risk-analysis.md。"""
     available, config = _check_llm_available(enable_dotenv)
 
     if not available:
@@ -302,10 +253,10 @@ def analyze_risk(digest_text, arch_md_text, stories_md_text, project_name, outpu
         file_path = _write_analysis_file(output_dir, "risk-analysis.md", content)
         return {"file_path": file_path, "status": "degraded", "content": content}
 
-    prompt = _build_risk_prompt(digest_text, arch_md_text, stories_md_text, project_name)
-    result = _call_llm(
+    user_prompt = _build_risk_prompt_from_files(filtered_files, arch_md_text, stories_md_text, project_name)
+    result = _call_llm_with_retry(
         system_prompt="你是一位资深代码审查专家和安全工程师，擅长发现代码中的潜在错误和安全风险。输出完整的 Markdown 文档。",
-        user_prompt=prompt,
+        user_prompt=user_prompt,
         config=config,
         max_tokens=4096,
         timeout=120,

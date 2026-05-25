@@ -44,7 +44,9 @@ class TestCollectDigest:
         if is_cdigest_available() and os.path.isdir(_PROJECT_ROOT):
             # When cdigest is available and path is valid, should be ok
             assert result["status"] == "ok"
-            assert len(result["text"]) > 0
+            # v0.5.1: text is always "" (no more full-text dump); files is the primary output
+            assert result["text"] == ""
+            assert len(result["files"]) > 0
             assert result["stats"]["files"] > 0
         else:
             # cdigest not installed or path issue — ok as long as no crash
@@ -137,4 +139,251 @@ class TestFormatDigestForLLM:
     def test_format_empty_list_returns_empty_string(self):
         from app.analyzer.digest_collector import format_digest_for_llm
         text = format_digest_for_llm([])
+        assert text == ""
+
+
+# ===========================================================================
+# TST-1 新增: 维度筛选函数测试
+# ===========================================================================
+
+
+class TestFilterForArchitecture:
+    """filter_for_architecture() 架构维度文件筛选"""
+
+    def test_filters_init_py_files(self):
+        from app.analyzer.digest_collector import filter_for_architecture
+        preprocessed = [
+            {"path": "src/__init__.py", "content": "# package"},
+            {"path": "app/__init__.py", "content": ""},
+            {"path": "src/main.py", "content": "print('hello')"},
+        ]
+        result = filter_for_architecture(preprocessed)
+        paths = {f["path"] for f in result}
+        assert "src/__init__.py" in paths
+        assert "app/__init__.py" in paths
+
+    def test_filters_config_files(self):
+        from app.analyzer.digest_collector import filter_for_architecture
+        preprocessed = [
+            {"path": "settings.json", "content": "{}"},
+            {"path": "config.yaml", "content": "key: val"},
+            {"path": "pyproject.toml", "content": "[tool]"},
+            {"path": "app.ini", "content": "[section]"},
+        ]
+        result = filter_for_architecture(preprocessed)
+        paths = {f["path"] for f in result}
+        assert "settings.json" in paths
+        assert "config.yaml" in paths
+        assert "pyproject.toml" in paths
+        assert "app.ini" in paths
+
+    def test_filters_entry_files(self):
+        from app.analyzer.digest_collector import filter_for_architecture
+        preprocessed = [
+            {"path": "main.py", "content": "x=1"},
+            {"path": "server.js", "content": "x=1"},
+            {"path": "cli.go", "content": "x=1"},
+            {"path": "setup.py", "content": "x=1"},
+            {"path": "other.py", "content": "x=1"},
+        ]
+        result = filter_for_architecture(preprocessed)
+        paths = {f["path"] for f in result}
+        assert "main.py" in paths
+        assert "server.js" in paths
+        assert "cli.go" in paths
+        assert "setup.py" in paths
+        assert "other.py" not in paths  # small non-entry file excluded
+
+    def test_filters_large_module_files(self):
+        from app.analyzer.digest_collector import filter_for_architecture
+        large_content = "x" * 4000
+        preprocessed = [
+            {"path": "core/engine.py", "content": large_content},
+            {"path": "core/small.py", "content": "pass"},  # < 3000 chars
+        ]
+        result = filter_for_architecture(preprocessed)
+        paths = {f["path"] for f in result}
+        assert "core/engine.py" in paths
+        assert "core/small.py" not in paths
+
+    def test_empty_list_returns_empty(self):
+        from app.analyzer.digest_collector import filter_for_architecture
+        result = filter_for_architecture([])
+        assert result == []
+
+
+class TestFilterForUserStories:
+    """filter_for_user_stories() 用户故事维度文件筛选"""
+
+    def test_filters_readme_files(self):
+        from app.analyzer.digest_collector import filter_for_user_stories
+        preprocessed = [
+            {"path": "README.md", "content": "# Project"},
+            {"path": "readme.txt", "content": "hello"},
+            {"path": "src/main.py", "content": "print(1)"},
+        ]
+        result = filter_for_user_stories(preprocessed)
+        paths = {f["path"] for f in result}
+        assert "README.md" in paths
+        assert "readme.txt" in paths
+        assert "src/main.py" not in paths
+
+    def test_filters_docs_directory(self):
+        from app.analyzer.digest_collector import filter_for_user_stories
+        preprocessed = [
+            {"path": "docs/guide.md", "content": "# Guide"},
+            {"path": "documentation/api.md", "content": "# API"},
+            {"path": "src/main.py", "content": "print(1)"},
+        ]
+        result = filter_for_user_stories(preprocessed)
+        paths = {f["path"] for f in result}
+        assert "docs/guide.md" in paths
+        assert "documentation/api.md" in paths
+        assert "src/main.py" not in paths
+
+    def test_filters_route_handler_view_files(self):
+        from app.analyzer.digest_collector import filter_for_user_stories
+        preprocessed = [
+            {"path": "app/routes.py", "content": "@app.route"},
+            {"path": "app/handlers/user.py", "content": "class Handler"},
+            {"path": "app/controllers/api.py", "content": "def index"},
+            {"path": "app/views/home.html", "content": "<html>"},
+            {"path": "app/serializers/user.py", "content": "class Serializer"},
+            {"path": "app/models/user.py", "content": "class User"},
+        ]
+        result = filter_for_user_stories(preprocessed)
+        paths = {f["path"] for f in result}
+        assert "app/routes.py" in paths
+        assert "app/handlers/user.py" in paths
+        assert "app/controllers/api.py" in paths
+        assert "app/views/home.html" in paths
+        assert "app/serializers/user.py" in paths
+        assert "app/models/user.py" not in paths
+
+    def test_filters_test_files(self):
+        from app.analyzer.digest_collector import filter_for_user_stories
+        preprocessed = [
+            {"path": "tests/test_auth.py", "content": "def test()"},
+            {"path": "src/utils_test.py", "content": "def test()"},
+            {"path": "src/test_helpers.py", "content": "def test()"},
+            {"path": "src/main.py", "content": "print(1)"},
+        ]
+        result = filter_for_user_stories(preprocessed)
+        paths = {f["path"] for f in result}
+        assert "tests/test_auth.py" in paths
+        assert "src/utils_test.py" in paths
+        assert "src/test_helpers.py" in paths
+        assert "src/main.py" not in paths
+
+    def test_empty_list_returns_empty(self):
+        from app.analyzer.digest_collector import filter_for_user_stories
+        result = filter_for_user_stories([])
+        assert result == []
+
+
+class TestFilterForRisk:
+    """filter_for_risk() 风险维度文件筛选"""
+
+    def test_filters_dependency_files(self):
+        from app.analyzer.digest_collector import filter_for_risk
+        preprocessed = [
+            {"path": "requirements.txt", "content": "flask==2.0"},
+            {"path": "package.json", "content": "{}"},
+            {"path": "pyproject.toml", "content": "[tool]"},
+            {"path": "setup.py", "content": "x=1"},
+            {"path": "src/other.py", "content": "print(1)"},
+        ]
+        result = filter_for_risk(preprocessed)
+        paths = {f["path"] for f in result}
+        assert "requirements.txt" in paths
+        assert "package.json" in paths
+        assert "pyproject.toml" in paths
+        assert "setup.py" in paths
+        assert "src/other.py" not in paths
+
+    def test_filters_risk_keyword_content(self):
+        from app.analyzer.digest_collector import filter_for_risk
+        preprocessed = [
+            {"path": "src/auth.py", "content": "PASSWORD = 'secret123'"},
+            {"path": "src/config.py", "content": "API_KEY = 'abc'"},
+            {"path": "src/clean.py", "content": "x = 1 + 2"},
+        ]
+        result = filter_for_risk(preprocessed)
+        paths = {f["path"] for f in result}
+        assert "src/auth.py" in paths
+        assert "src/config.py" in paths
+        assert "src/clean.py" not in paths
+
+    def test_filters_config_and_env_files(self):
+        from app.analyzer.digest_collector import filter_for_risk
+        preprocessed = [
+            {"path": ".env", "content": "SECRET=xxx"},
+            {"path": "config.py", "content": "DEBUG=True"},
+            {"path": "settings.py", "content": "DB_URL=xxx"},
+            {"path": "lib/util.py", "content": "def f(): pass"},
+        ]
+        result = filter_for_risk(preprocessed)
+        paths = {f["path"] for f in result}
+        assert ".env" in paths
+        assert "config.py" in paths
+        assert "settings.py" in paths
+        assert "lib/util.py" not in paths
+
+    def test_filters_script_files(self):
+        from app.analyzer.digest_collector import filter_for_risk
+        preprocessed = [
+            {"path": "deploy.sh", "content": "#!/bin/bash"},
+            {"path": "run.bat", "content": "@echo off"},
+            {"path": "setup.ps1", "content": "Write-Host"},
+            {"path": "src/app.py", "content": "print(1)"},
+        ]
+        result = filter_for_risk(preprocessed)
+        paths = {f["path"] for f in result}
+        assert "deploy.sh" in paths
+        assert "run.bat" in paths
+        assert "setup.ps1" in paths
+        assert "src/app.py" not in paths
+
+    def test_filters_error_handling_files(self):
+        from app.analyzer.digest_collector import filter_for_risk
+        preprocessed = [
+            {"path": "src/errors.py", "content": "class Error"},
+            {"path": "src/exception.py", "content": "class Exception"},
+            {"path": "src/logging_config.py", "content": "import logging"},
+            {"path": "src/logger.py", "content": "logger = ..."},
+            {"path": "src/main.py", "content": "print(1)"},
+        ]
+        result = filter_for_risk(preprocessed)
+        paths = {f["path"] for f in result}
+        assert "src/errors.py" in paths
+        assert "src/exception.py" in paths
+        assert "src/logging_config.py" in paths
+        assert "src/logger.py" in paths
+        assert "src/main.py" not in paths
+
+    def test_empty_list_returns_empty(self):
+        from app.analyzer.digest_collector import filter_for_risk
+        result = filter_for_risk([])
+        assert result == []
+
+
+class TestFormatFilesForLLM:
+    """format_files_for_llm() 文件列表格式化 LLM 文本"""
+
+    def test_format_contains_file_markers(self):
+        from app.analyzer.digest_collector import format_files_for_llm
+        files = [
+            {"path": "src/main.py", "content": "print('hello')"},
+            {"path": "src/utils.py", "content": "def foo(): pass"},
+        ]
+        text = format_files_for_llm(files)
+        assert "### File: src/main.py" in text
+        assert "```" in text
+        assert "print('hello')" in text
+        assert "### File: src/utils.py" in text
+        assert "def foo(): pass" in text
+
+    def test_format_empty_list_returns_empty_string(self):
+        from app.analyzer.digest_collector import format_files_for_llm
+        text = format_files_for_llm([])
         assert text == ""

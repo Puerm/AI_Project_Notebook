@@ -53,7 +53,7 @@ def _get_llm_config(enable_dotenv=True):
     }
 
 
-def _call_llm(system_prompt, user_prompt, config, max_tokens=256, timeout=10):
+def _call_llm(system_prompt, user_prompt, config, max_tokens=256, timeout=10, silent=False):
     """通过 urllib 调用 LLM API，返回响应文本或 None。"""
     if not config["api_key"]:
         return None
@@ -92,7 +92,8 @@ def _call_llm(system_prompt, user_prompt, config, max_tokens=256, timeout=10):
             data = json.loads(resp.read().decode("utf-8"))
     except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError,
             TimeoutError, OSError) as e:
-        print(f"[LLM] API 调用失败: {e}", file=sys.stderr)
+        if not silent:
+            print(f"[LLM] API 调用失败: {e}", file=sys.stderr)
         return None
 
     if config["provider"] == "anthropic":

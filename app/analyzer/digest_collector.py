@@ -126,20 +126,140 @@ def _truncate_text(text, max_bytes):
 
 
 def format_digest_for_llm(preprocessed):
-    """将预处理后的文件列表格式化为 LLM 可消费的纯文本。"""
+    """将预处理后的文件列表格式化为 LLM 可消费的纯文本（保留向后兼容）。"""
+    return format_files_for_llm(preprocessed)
+
+
+def format_files_for_llm(files: list) -> str:
+    """将文件列表格式化为 LLM 可消费的纯文本。"""
     parts = []
-    for f in preprocessed:
+    for f in files:
         path = f["path"]
         content = f["content"]
         parts.append(f"### File: {path}\n```\n{content}\n```\n")
     return "\n".join(parts)
 
 
+def filter_for_architecture(preprocessed: list) -> list:
+    """筛选架构分析相关文件（目录结构、配置、入口、大型模块）。"""
+    result = []
+    for f in preprocessed:
+        path = f.get("path", "")
+        content = f.get("content", "")
+        path_lower = path.lower()
+        basename = os.path.basename(path).lower()
+
+        # 目录结构文件
+        if basename == "__init__.py":
+            result.append(f)
+            continue
+
+        # 配置文件
+        if any(path_lower.endswith(ext) for ext in [".json", ".yaml", ".yml", ".toml", ".cfg", ".ini", ".conf"]):
+            result.append(f)
+            continue
+
+        # 入口文件
+        entry_names = {"main", "app", "index", "server", "cli", "setup", "manage", "run"}
+        name_no_ext = os.path.splitext(basename)[0].lower()
+        if name_no_ext in entry_names:
+            result.append(f)
+            continue
+
+        # 大型模块文件 (>3000 字符，可能是核心模块)
+        if len(content) > 3000 and path_lower.endswith(".py"):
+            result.append(f)
+            continue
+
+    return result
+
+
+def filter_for_user_stories(preprocessed: list) -> list:
+    """筛选用户故事分析相关文件（README、文档、路由、handler/controller、测试）。"""
+    result = []
+    for f in preprocessed:
+        path = f.get("path", "")
+        content = f.get("content", "")
+        path_lower = path.lower()
+        basename = os.path.basename(path).lower()
+
+        # README 文件
+        if basename.startswith("readme"):
+            result.append(f)
+            continue
+
+        # 文档目录
+        if any(part in path.replace("\\", "/").split("/") for part in ["docs", "doc", "documentation"]):
+            result.append(f)
+            continue
+
+        # 路由文件
+        if any(kw in path_lower for kw in ["route", "router", "urls", "endpoint"]):
+            result.append(f)
+            continue
+
+        # Handler / Controller / View 文件
+        if any(kw in path_lower for kw in ["handler", "controller", "view", "serializer", "schema"]):
+            result.append(f)
+            continue
+
+        # 测试文件
+        if basename.startswith("test_") or basename.endswith("_test.py") or "/tests/" in path.replace("\\", "/"):
+            result.append(f)
+            continue
+
+    return result
+
+
+def filter_for_risk(preprocessed: list) -> list:
+    """筛选风险分析相关文件（安全关键词、错误处理、配置、依赖、脚本）。"""
+    result = []
+    risk_keywords = ["secret", "password", "token", "api_key", "apikey", "private_key",
+                     "credential", "auth", "permission", "role", "admin"]
+
+    for f in preprocessed:
+        path = f.get("path", "")
+        content = f.get("content", "")
+        path_lower = path.lower()
+        basename = os.path.basename(path).lower()
+        content_lower = content.lower()
+
+        # 依赖文件
+        if basename in {"requirements.txt", "package.json", "pyproject.toml", "setup.py",
+                        "setup.cfg", "pom.xml", "build.gradle", "cargo.toml", "go.mod"}:
+            result.append(f)
+            continue
+
+        # 配置文件
+        if any(basename == p for p in [".env", ".env.example", "config.py", "settings.py", "config.json",
+                                        "config.yaml", "config.yml", ".editorconfig"]):
+            result.append(f)
+            continue
+
+        # 脚本文件
+        if path_lower.endswith((".sh", ".bat", ".ps1", ".psm1")):
+            result.append(f)
+            continue
+
+        # 错误处理相关文件
+        if any(kw in path_lower for kw in ["error", "exception", "logging", "logger"]):
+            result.append(f)
+            continue
+
+        # 包含安全/风险关键词的内容
+        if any(kw in content_lower for kw in risk_keywords):
+            result.append(f)
+            continue
+
+    return result
+
+
 def collect_digest(target_path, max_size_kb=10240):
-    """编排函数：可用性检查 → 收集 → 预处理 → 格式化。"""
+    """编排函数：可用性检查 → 收集 → 预处理，返回文件列表（不再格式化全量 LLM 文本）。"""
     if not is_cdigest_available():
         return {
             "text": "",
+            "files": [],
             "status": "cdigest_unavailable",
             "stats": {"files": 0, "total_tokens": 0},
         }
@@ -148,15 +268,16 @@ def collect_digest(target_path, max_size_kb=10240):
     if raw["status"] != "ok":
         return {
             "text": "",
+            "files": [],
             "status": raw["status"],
             "stats": {"files": 0, "total_tokens": 0},
         }
 
     preprocessed = preprocess_digest(raw, max_size_kb)
-    text = format_digest_for_llm(preprocessed)
 
     return {
-        "text": text,
+        "text": "",
+        "files": preprocessed,
         "status": "ok",
         "stats": {
             "files": len(preprocessed),
