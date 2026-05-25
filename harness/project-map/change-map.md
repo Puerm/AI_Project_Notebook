@@ -4,6 +4,33 @@
 
 ## 变更记录
 
+### 2026-05-25: fix-harness-feedback-loop — save_signals 空操作修复 + generate_rule_evolution 原子写入补全
+
+- **类型**: 修复
+- **范围**: 2 个文件
+- **摘要**: 修复测试报告中阻塞 bug 和第二类问题
+  - **阻塞 bug**: `feedback_engine.py` — `save_signals()` 方法体从 `pass` 替换为实际原子写入。`__init__` 新增 `self._signals` 内存缓存，`add_signal()` 同步更新缓存，`save_signals()` 从缓存写入磁盘（.tmp + os.replace）
+  - **第二类**: `generate_rule_evolution.py` — 追加模式从直接 `open("a")` 替换为原子写入（先读已有内容再整体 .tmp + os.replace）
+- **影响文件**: `harness/state/feedback_engine.py`, `harness/scripts/generate_rule_evolution.py`
+- **验证**: `python harness/scripts/check_structure.py` 47/47 通过, `python -m pytest tests/` 254/254 通过
+
+### 2026-05-25: Harness 反馈调节系统 v0.1 — 偏差趋势自适应回环 + 规则演化引擎
+
+- **类型**: 新功能
+- **范围**: 4 个新建文件 + 7 个修改文件
+- **摘要**: 实现工作流反馈闭环：偏差趋势自适应回环替代硬编码"最多 2 次"、反馈信号持久化引擎、规则演化建议自动生成
+  - **IMP-1**: 新建 `harness/state/feedback_signal.py` — FeedbackSignal dataclass（7 个字段 + to_dict/from_dict/to_json_schema）
+  - **IMP-2**: 新建 `harness/state/feedback_engine.py` — FeedbackEngine 类（JSON 读写/去重/重复模式检测 >=3 次）
+  - **IMP-3**: 新建 `harness/state/workflow_state.py` — WorkflowState 类（init/record_stage/get_deviation_trend/should_continue_loop/to_feedback_signal，偏差趋势自适应回环决策）
+  - **IMP-4**: 新建 `harness/scripts/generate_rule_evolution.py` — 扫描反馈信号生成 rule-evolution-proposal.md
+  - **IMP-5**: `check_structure.py` — REQUIRED_DIRS 新增 `harness/state`（12 -> 13 目录）
+  - **IMP-6**: `.gitignore` — 忽略运行时生成的 JSON 状态文件
+  - **IMP-7**: 4 个 `.claude/commands/workflow/*.md` — 升级为自包含的偏差趋势自适应回环指令（WorkflowState 初始化 + 偏差趋势判断 + FeedbackSignal 追加 + generate_rule_evolution.py 收尾），不再使用跨文件引用
+  - **IMP-8**: `.claude/agents/planner.md` — 新增第 6 步：阅读 rule-evolution-proposal.md 未处理建议
+  - **IMP-9**: 5 个 project-map 文档同步更新（directory-map/module-map/data-flow/command-map/change-map）
+- **影响文件**: `harness/state/` (新建 4 文件), `harness/scripts/generate_rule_evolution.py` (新建), `check_structure.py`, `.gitignore`, 4 个 `.claude/commands/workflow/*.md`, `planner.md`, 5 个 project-map 文件
+- **验证**: `python harness/scripts/check_structure.py` 通过 (47/47), self-tests 通过
+
 ### 2026-05-22: v0.5.1 修复 LLM 全量分析失焦问题 — 聚焦分析替代全量 dump
 
 - **类型**: 修复

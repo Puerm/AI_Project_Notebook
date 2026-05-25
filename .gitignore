@@ -21,3 +21,7 @@ Thumbs.db
 .env
 .venv/
 venv/
+
+# Harness runtime state
+harness/state/feedback-signals.json
+harness/state/current-workflow.json

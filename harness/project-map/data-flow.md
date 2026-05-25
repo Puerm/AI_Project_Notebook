@@ -125,3 +125,46 @@ target_path/
     }
 }
 ```
+
+---
+
+## 反馈信号与工作流状态
+
+### FeedbackSignal (feedback_signal.py 输出)
+
+```json
+{
+    "signal_type": "rule_violation | error | improvement | loop_deviation",
+    "severity": "blocking | non_blocking | info",
+    "rule_ref": "string (关联规则路径)",
+    "occurrences": 1,
+    "first_seen": "ISO timestamp",
+    "last_seen": "ISO timestamp",
+    "source": "string (来源标识)"
+}
+```
+
+### WorkflowState (workflow_state.py 管理的 current-workflow.json)
+
+```json
+{
+    "topic": "string",
+    "started_at": "ISO timestamp",
+    "stages": {
+        "explorer": {
+            "iterations": 0,
+            "history": [
+                {
+                    "deviation_count": 0,
+                    "status": "ok",
+                    "timestamp": "..."
+                }
+            ]
+        },
+        "tester": {
+            "iterations": 0,
+            "history": [...]
+        }
+    }
+}
+```

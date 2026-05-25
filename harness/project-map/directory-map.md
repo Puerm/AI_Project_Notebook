@@ -22,6 +22,18 @@
     │       ├── parser.py
     │       └── scanner.py
     ├── data/  # 数据
+    ├── harness/
+    │   ├── rules/  # 规则
+    │   ├── scripts/  # CLI 脚本
+    │   ├── skills/  # 技能目录
+    │   ├── workflow/  # 工作流定义
+    │   ├── project-map/  # 项目地图
+    │   ├── feedback/  # 反馈日志
+    │   └── state/  # 工作流运行时状态
+    │       ├── __init__.py
+    │       ├── feedback_signal.py
+    │       ├── feedback_engine.py
+    │       └── workflow_state.py
     ├── openspec/
     │   ├── changes/
     │   │   ├── archive/

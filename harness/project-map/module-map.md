@@ -18,6 +18,10 @@
 | app\analyzer\scanner.py | EXCLUDE_DIRS 常量（目录排除规则） | _infer_dir_label, scan_directory, detect_source_root, detect_source_roots | - |
 | app\analyzer\parser.py | ~~已移除~~ — 不再被导入 | parse_python, check_nodejs, _parse_js_regex | - |
 | app\analyzer\overview.py | ~~已移除~~ — 不再被导入 | analyze_overview, _detect_tech_stack, _detect_entry_files | - |
+| harness\state\feedback_signal.py | 反馈信号数据模型 | to_dict, from_dict, to_json_schema | FeedbackSignal |
+| harness\state\feedback_engine.py | 反馈信号引擎（读写/去重/模式检测） | load_signals, add_signal, save_signals, detect_patterns | FeedbackEngine |
+| harness\state\workflow_state.py | 工作流状态管理器（偏差趋势/回环决策） | init, record_stage, get_deviation_trend, should_continue_loop, to_feedback_signal | WorkflowState |
+| harness\scripts\generate_rule_evolution.py | 规则演化建议生成脚本 | - | - |
 | tests\test_export_report.py | 导出报告测试 | test_export_report_runs_and_returns_zero, test_export_report_contains_expected_sections, test_export_report_sections_have_numbered_source_labels | - |
 | tests\test_help.py | help 命令测试 | test_help_runs_and_returns_zero, test_help_lists_all_commands | - |
 | tests\test_init_project.py | 初始化项目测试 | test_init_project_creates_harness_dir, test_init_project_generates_directory_map_with_tree, test_init_project_refuses_existing_harness, test_init_project_refuses_nonexistent_path, test_init_project_missing_argument_exits_one | - |

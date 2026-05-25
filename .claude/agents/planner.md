@@ -23,6 +23,7 @@ tools: Read, Glob, Grep, Bash, Write
 3. `harness/project-map/module-map.md` — 现有模块和依赖
 4. `harness/rules/coding-rules.md` — 编码约束
 5. `harness/rules/workflow-rules.md` — 工作流约束
+6. `harness/feedback/rule-evolution-proposal.md` — 若文件存在且含 `> 状态: 待确认` 的建议条目，阅读这些未处理建议并纳入计划上下文。当计划涉及相关规则文件时，优先参考演化建议。
 
 ## 产出格式
 

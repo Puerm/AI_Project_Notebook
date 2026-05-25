@@ -14,6 +14,7 @@ REQUIRED_DIRS = [
     "harness/workflow",
     "harness/project-map",
     "harness/feedback",
+    "harness/state",
     ".claude",
     ".claude/agents",
     ".claude/commands",
