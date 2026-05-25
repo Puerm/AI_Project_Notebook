@@ -501,7 +501,7 @@ def _get_current_branch() -> str | None:
     try:
         result = subprocess.run(
             ["git", "-C", _PROJECT_ROOT, "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True, text=True, timeout=10
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -523,7 +523,7 @@ def _create_worktree(worktree_path: str) -> str | None:
     try:
         result = subprocess.run(
             ["git", "-C", _PROJECT_ROOT, "worktree", "add", "-b", branch_name, worktree_path, current_branch],
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
         )
         if result.returncode != 0:
             # 路径已注册但目录缺失（前次异常留下的残留登记）
@@ -534,7 +534,7 @@ def _create_worktree(worktree_path: str) -> str | None:
                 )
                 result = subprocess.run(
                     ["git", "-C", _PROJECT_ROOT, "worktree", "add", "-b", branch_name, worktree_path, current_branch],
-                    capture_output=True, text=True, timeout=30
+                    capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
                 )
                 if result.returncode != 0:
                     print(f"[worktree] 创建失败 (prune 后): {result.stderr.strip()}")
@@ -614,7 +614,7 @@ def _run_verification(worktree_path: str) -> tuple[bool, list[str]]:
         try:
             result = subprocess.run(
                 [sys.executable, check_script],
-                capture_output=True, text=True, timeout=30, cwd=worktree_path
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30, cwd=worktree_path
             )
             combined = result.stdout + result.stderr
             if "FAIL" in combined or result.returncode != 0:
@@ -632,7 +632,7 @@ def _run_verification(worktree_path: str) -> tuple[bool, list[str]]:
         try:
             result = subprocess.run(
                 [sys.executable, "-m", "pytest", "tests/", "-v"],
-                capture_output=True, text=True, timeout=600, cwd=worktree_path
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600, cwd=worktree_path
             )
             combined = result.stdout + result.stderr
             if "FAILED" in combined:
@@ -687,7 +687,7 @@ def _merge_worktree(worktree_path: str, branch_name: str) -> bool:
         # 合并
         result = subprocess.run(
             ["git", "-C", _PROJECT_ROOT, "merge", branch_name, "--no-edit"],
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
         )
         if result.returncode != 0:
             print(f"[worktree] merge 失败: {result.stderr.strip()}")
@@ -710,7 +710,7 @@ def _remove_worktree(worktree_path: str, force: bool = False) -> None:
         if force:
             cmd.append("--force")
         cmd.append(worktree_path)
-        subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         # 如果目录仍然存在，手动删除
         if os.path.exists(worktree_path):
             shutil.rmtree(worktree_path, ignore_errors=True)
@@ -726,13 +726,13 @@ def _discard_worktree(worktree_path: str) -> None:
     try:
         result = subprocess.run(
             ["git", "-C", _PROJECT_ROOT, "branch", "--list", "self-upgrade-*"],
-            capture_output=True, text=True, timeout=10
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10
         )
         branches = [b.strip() for b in result.stdout.splitlines() if b.strip()]
         for branch in branches:
             subprocess.run(
                 ["git", "-C", _PROJECT_ROOT, "branch", "-D", branch],
-                capture_output=True, text=True, timeout=10
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10
             )
     except (subprocess.TimeoutExpired, subprocess.SubprocessError):
         pass

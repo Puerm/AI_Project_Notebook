@@ -31,17 +31,17 @@ python harness/scripts/check_structure.py
 # 查看项目总览
 cat harness/project-map/overview.md
 
-# 渐进式分析项目（LLM 必需）
+# 渐进式分析项目（无 LLM 也能运行，LLM 增强分析深度）
 python harness/scripts/analyze_project.py <目标路径>
 
-# 聚焦三维度分析（架构/用户故事/风险）
+# 聚焦三维度分析（架构/用户故事/风险，需 LLM）
 pip install codebase-digest
 python harness/scripts/analyze_project.py <目标路径> --digest
 
-# 规则演化检查（扫描反馈信号，检测重复模式）
+# 规则演化检查（扫描反馈信号，检测重复模式，不依赖 LLM）
 python harness/scripts/generate_rule_evolution.py
 
-# Harness 自我升级（自动诊断并修复重复问题）
+# Harness 自我升级（自动诊断并修复重复问题，LLM 提升诊断精度）
 python harness/scripts/diagnose_and_fix.py          # 交互模式
 python harness/scripts/diagnose_and_fix.py --yes    # 自动确认 semi-auto
 python harness/scripts/diagnose_and_fix.py --dry-run # 仅诊断不修改
@@ -57,7 +57,7 @@ python harness/scripts/init_project.py <目标项目路径>
 python harness/scripts/analyze_project.py <目标项目路径>
 ```
 
-> **提示**：LLM 增强需要 API Key。在 Notebook 根目录创建 `.env` 文件写入 `ANTHROPIC_API_KEY=你的Key`。
+> **提示**：LLM 增强分析深度，但不是硬依赖。无 API Key 时，项目分析降级为纯静态扫描，自我升级引擎降级为规则匹配模式。配置 API Key：在 Notebook 根目录创建 `.env` 写入 `ANTHROPIC_API_KEY=你的Key`。
 
 ## 目录结构
 

@@ -119,7 +119,7 @@ auto_levels:
 """
         result = _parse_minimal_yaml(yaml)
         assert result["safety_boundary"]["add_max_lines"] == 50
-        assert result["safety_boundary"]["replace_max_lines"] == 20
+        assert result["safety_boundary"]["replace_max_lines"] == 80
         assert result["dedup"]["window_hours"] == 24
 
     def test_parse_empty_yaml_returns_defaults(self):

@@ -198,7 +198,19 @@
 - **影响文件**: 6 新建 + 2 修改脚本 + 7 文档更新 = 15 文件
 - **验证**: `python harness/scripts/check_structure.py` 待验证
 
-### 2026-05-21: 工作流回环机制 — Explorer/Tester 阻塞路由
+### 2026-05-25: 修复文档失真 + 测试断言过期 + Windows 编码隐患
+
+- **类型**: 修复
+- **范围**: 测试 / 脚本 / 项目地图 / README
+- **摘要**: 代码审查发现的四个具体问题修复
+  - **测试断言过期**: `test_parse_missing_sections_use_defaults` 期望 `replace_max_lines=20`，但 `_DEFAULT_CONFIG` 已改为 80。更新断言为 80。
+  - **Windows 编码兼容**: `diagnose_and_fix.py` 子进程调用 `text=True` 无 `encoding`，Windows cp936 解码 UTF-8 输出触发 `UnicodeDecodeError`。全部加上 `encoding="utf-8", errors="replace"`。
+  - **overview.md 版本严重滞后**: 仍显示 v0.1 自动生成内容，项目已到 v0.8。完全重写。
+  - **LLM 依赖语义模糊**: README 写"LLM 必需"但代码有多处降级路径。改为准确描述：LLM 增强深度，无 Key 时降级为纯静态扫描/规则匹配。
+- **影响文件**: diagnose_and_fix.py, test_diagnose_and_fix.py, overview.md, README.md
+- **验证**: `pytest tests/test_diagnose_and_fix.py -v` 69/69 通过, `check_structure.py` 52/52 通过
+
+### 2026-05-25: 工作流回环机制 — Explorer/Tester 阻塞路由
 
 - **类型**: 新功能
 - **范围**: Agent 定义 + 工作流 YAML + 编排器命令
