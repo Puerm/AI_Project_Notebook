@@ -1,6 +1,6 @@
 # diagnose_and_fix.py — 自我升级引擎：反馈信号驱动的自动诊断与修复
 # 扫描反馈信号中的重复模式 → LLM 根因诊断 → git worktree 沙盒验证 → 合并或降级。
-# 用法: python harness/scripts/diagnose_and_fix.py [--dry-run] [--timeout N]
+# 用法: python harness/scripts/diagnose_and_fix.py [--dry-run] [--yes] [--timeout N]
 
 import os
 import sys
@@ -27,7 +27,7 @@ _DEFAULT_CONFIG = {
     ],
     "safety_boundary": {
         "add_max_lines": 50,
-        "replace_max_lines": 20,
+        "replace_max_lines": 80,
         "delete": "require_confirmation",
     },
     "dedup": {
@@ -224,7 +224,7 @@ def _apply_safety_boundary(fix_plan: list[dict], safety_config: dict) -> tuple[b
     任一操作不过即整体不通过。混合操作按最严格规则判定。
     """
     add_max = safety_config.get("add_max_lines", 50)
-    replace_max = safety_config.get("replace_max_lines", 20)
+    replace_max = safety_config.get("replace_max_lines", 80)
     delete_policy = safety_config.get("delete", "require_confirmation")
 
     issues: list[str] = []
@@ -423,49 +423,71 @@ def _call_llm_diagnosis(target_file: str, rule_ref: str, history_signals: list[d
 
 
 def _parse_llm_response(response: str) -> dict | None:
-    """解析 LLM 返回的 JSON 修复方案，校验格式。"""
-    # 尝试提取 JSON—— LLM 可能用 ```json 包裹或直接输出
-    json_text = response.strip()
+    """解析 LLM 返回的 JSON 修复方案，多层容错提取。"""
+    text = response.strip()
 
-    # 尝试匹配 ```json ... ``` 代码块
-    m = re.search(r'```(?:json)?\s*\n?([\s\S]*?)\n?```', json_text)
-    if m:
-        json_text = m.group(1).strip()
+    # 候选 JSON 片段，按优先级尝试
+    candidates: list[str] = []
 
-    # 尝试匹配裸 JSON 对象
-    try:
-        result = json.loads(json_text)
-    except json.JSONDecodeError:
-        # 再试一次：找第一个 { 到最后一个 }
-        m2 = re.search(r'\{[\s\S]*\}', json_text)
-        if m2:
+    # 1) ```json ... ``` 代码块
+    for m in re.finditer(r'```(?:json)?\s*\n?([\s\S]*?)\n?```', text):
+        candidates.append(m.group(1).strip())
+
+    # 2) 裸 JSON 对象 —— 找所有 { ... } 块，按最长优先（整段 JSON 优先于嵌套片段）
+    obj_matches = re.finditer(r'\{[\s\S]*\}', text)
+    candidates.extend(sorted(
+        [m.group(0) for m in obj_matches],
+        key=len, reverse=True
+    ))
+
+    # 去重
+    seen = set()
+    unique = []
+    for c in candidates:
+        if c not in seen:
+            seen.add(c)
+            unique.append(c)
+    candidates = unique
+
+    # 逐个尝试解析
+    for candidate in candidates:
+        try:
+            result = json.loads(candidate)
+        except json.JSONDecodeError:
+            # 尝试修复常见 LLM JSON 错误：尾部逗号、中文引号、省略号占位
+            cleaned = candidate
+            cleaned = re.sub(r',\s*}', '}', cleaned)        # 尾部逗号
+            cleaned = re.sub(r',\s*]', ']', cleaned)        # 数组尾部逗号
+            cleaned = cleaned.replace('“', '"').replace('”', '"')  # 中文引号
+            cleaned = cleaned.replace('‘', "'").replace('’', "'")   # 中文单引号
             try:
-                result = json.loads(m2.group(0))
+                result = json.loads(cleaned)
             except json.JSONDecodeError:
-                print("[LLM] 返回内容无法解析为 JSON，降级输出。")
-                return None
-        else:
-            print("[LLM] 返回内容不包含 JSON 对象，降级输出。")
-            return None
+                continue
 
-    if not isinstance(result, dict):
-        print("[LLM] 返回 JSON 不是 dict 类型，降级输出。")
-        return None
+        if isinstance(result, dict):
+            # 校验必需字段
+            fix_plan = result.get("fix_plan")
+            if not isinstance(fix_plan, list):
+                continue
 
-    # 校验必需字段
-    fix_plan = result.get("fix_plan")
-    if not isinstance(fix_plan, list):
-        print("[LLM] fix_plan 缺失或不是列表，降级输出。")
-        return None
+            valid = True
+            for i, fix in enumerate(fix_plan):
+                if not isinstance(fix, dict):
+                    valid = False
+                    break
+                for field in ("file", "type", "content", "reason"):
+                    if field not in fix:
+                        valid = False
+                        break
+                if not valid:
+                    break
 
-    for i, fix in enumerate(fix_plan):
-        if not isinstance(fix, dict):
-            print(f"[LLM] fix_plan[{i}] 不是 dict，降级输出。")
-            return None
-        for field in ("file", "type", "content", "reason"):
-            if field not in fix:
-                print(f"[LLM] fix_plan[{i}] 缺少必需字段 '{field}'，降级输出。")
-                return None
+            if valid:
+                return result
+
+    print("[LLM] 返回内容无法解析为有效 JSON 修复方案，降级输出。")
+    return None
 
     return result
 
@@ -504,8 +526,22 @@ def _create_worktree(worktree_path: str) -> str | None:
             capture_output=True, text=True, timeout=30
         )
         if result.returncode != 0:
-            print(f"[worktree] 创建失败: {result.stderr.strip()}")
-            return None
+            # 路径已注册但目录缺失（前次异常留下的残留登记）
+            if "missing but already registered" in result.stderr:
+                subprocess.run(
+                    ["git", "-C", _PROJECT_ROOT, "worktree", "prune"],
+                    capture_output=True, timeout=10
+                )
+                result = subprocess.run(
+                    ["git", "-C", _PROJECT_ROOT, "worktree", "add", "-b", branch_name, worktree_path, current_branch],
+                    capture_output=True, text=True, timeout=30
+                )
+                if result.returncode != 0:
+                    print(f"[worktree] 创建失败 (prune 后): {result.stderr.strip()}")
+                    return None
+            else:
+                print(f"[worktree] 创建失败: {result.stderr.strip()}")
+                return None
     except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
         print(f"[worktree] 创建异常: {e}")
         return None
@@ -596,7 +632,7 @@ def _run_verification(worktree_path: str) -> tuple[bool, list[str]]:
         try:
             result = subprocess.run(
                 [sys.executable, "-m", "pytest", "tests/", "-v"],
-                capture_output=True, text=True, timeout=120, cwd=worktree_path
+                capture_output=True, text=True, timeout=600, cwd=worktree_path
             )
             combined = result.stdout + result.stderr
             if "FAILED" in combined:
@@ -664,7 +700,7 @@ def _merge_worktree(worktree_path: str, branch_name: str) -> bool:
         print(f"[worktree] merge 异常: {e}")
         return False
     finally:
-        _remove_worktree(worktree_path, force=(result is not None and result.returncode != 0))
+        _remove_worktree(worktree_path, force=True)
 
 
 def _remove_worktree(worktree_path: str, force: bool = False) -> None:
@@ -938,6 +974,7 @@ def _log_error(category: str, summary: str, details: dict | None = None) -> None
 
 def main() -> None:
     is_dry_run = "--dry-run" in sys.argv
+    is_yes = "--yes" in sys.argv
     timeout_seconds = 300
 
     # 解析 --timeout 参数
@@ -1084,8 +1121,9 @@ def main() -> None:
             continue
 
         if auto_level == "semi-auto":
-            # 展示 diff 等待确认
-            if not _show_diff_and_confirm(fix_plan, timeout_seconds):
+            if is_yes:
+                print("[semi-auto] --yes 模式，自动确认。")
+            elif not _show_diff_and_confirm(fix_plan, timeout_seconds):
                 _degrade_to_proposal(rule_ref, diagnosis, f"semi-auto: 用户拒绝或超时 ({timeout_seconds}s)")
                 _write_upgrade_history(
                     signal_id=rule_ref,

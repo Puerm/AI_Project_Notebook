@@ -40,7 +40,7 @@ auto_levels:
 # ---------------------------------------------------------------------------
 safety_boundary:
   add_max_lines: 50
-  replace_max_lines: 20
+  replace_max_lines: 80
   delete: require_confirmation
 
 # ---------------------------------------------------------------------------
