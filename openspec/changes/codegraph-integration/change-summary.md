@@ -1,6 +1,6 @@
 # Change Summary: CodeGraph 集成 — 图谱增强项目分析
 
-> 对应 spec: `openspec/specs/codegraph-integration.md`
+> 对应 spec: `openspec/specs/v1.1codegraph-integration.md`
 > 对应 plan: `openspec/changes/codegraph-integration/plan.md`
 > 生成时间: 2026-05-26
 

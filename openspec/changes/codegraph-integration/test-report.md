@@ -1,6 +1,6 @@
 # Test Report: CodeGraph 集成
 
-> 对应 spec: `openspec/specs/codegraph-integration.md`
+> 对应 spec: `openspec/specs/v1.1codegraph-integration.md`
 > 对应 plan: `openspec/changes/codegraph-integration/plan.md`
 > 测试时间: 2026-05-26
 
