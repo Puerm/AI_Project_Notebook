@@ -115,6 +115,154 @@ def _call_llm(system_prompt, user_prompt, config, max_tokens=256, timeout=10, si
     return None
 
 
+def _call_llm_with_tools(system_prompt, user_prompt, tools_def, tool_handler, config,
+                       max_rounds=5, timeout=120):
+    """带 tool use (function calling) 的多轮 LLM 调用循环，返回最终文本响应或 None。"""
+    if not config["api_key"]:
+        return None
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+    collected_text = []
+
+    for round_num in range(1, max_rounds + 1):
+        if config["provider"] == "anthropic":
+            body = {
+                "model": config["model"],
+                "max_tokens": 4096,
+                "system": system_prompt,
+                "messages": [m for m in messages if m["role"] != "system"],
+                "tools": tools_def,
+            }
+            url = (config.get("api_base") or "https://api.anthropic.com") + "/v1/messages"
+            headers = {
+                "x-api-key": config["api_key"],
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            }
+            req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"),
+                                         headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+            except (urllib.error.HTTPError, urllib.error.URLError,
+                    json.JSONDecodeError, TimeoutError, OSError) as e:
+                print(f"[LLM tool-use] API 调用失败 (轮次 {round_num}): {e}", file=sys.stderr)
+                return collected_text[-1] if collected_text else None
+
+            # Anthropic: 检查 stop_reason
+            stop_reason = data.get("stop_reason", "")
+            content = data.get("content", [])
+
+            if stop_reason == "end_turn":
+                # 纯文本响应，对话结束
+                if content and isinstance(content, list):
+                    for block in content:
+                        if block.get("type") == "text":
+                            return block.get("text", "").strip()
+                return None
+
+            # 检查是否有 tool_use
+            tool_use_blocks = [b for b in content if b.get("type") == "tool_use"]
+            if not tool_use_blocks:
+                # 没有 tool_use 也没有 end_turn，可能是其他情况
+                if content and isinstance(content, list) and content[0].get("type") == "text":
+                    return content[0].get("text", "").strip()
+                return None
+
+            # 收集本轮文本
+            for block in content:
+                if block.get("type") == "text":
+                    collected_text.append(block.get("text", ""))
+
+            # 构造 assistant 消息（含所有 content blocks）
+            assistant_msg = {"role": "assistant", "content": content}
+            messages.append(assistant_msg)
+
+            # 执行每个 tool_use 并追加 tool_result
+            tool_results = []
+            for tb in tool_use_blocks:
+                tool_name = tb.get("name", "")
+                arguments = tb.get("input", {})
+                try:
+                    result_str = tool_handler(tool_name, arguments)
+                except Exception as exc:
+                    result_str = f"工具执行异常: {type(exc).__name__}: {exc}"
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tb.get("id", ""),
+                    "content": result_str,
+                })
+            messages.append({"role": "user", "content": tool_results})
+
+        else:
+            # OpenAI 兼容格式
+            body = {
+                "model": config["model"],
+                "max_tokens": 4096,
+                "messages": messages,
+                "tools": tools_def,
+            }
+            url = (config.get("api_base") or "https://api.openai.com") + "/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {config['api_key']}",
+                "Content-Type": "application/json",
+            }
+            req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"),
+                                         headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+            except (urllib.error.HTTPError, urllib.error.URLError,
+                    json.JSONDecodeError, TimeoutError, OSError) as e:
+                print(f"[LLM tool-use] API 调用失败 (轮次 {round_num}): {e}", file=sys.stderr)
+                return collected_text[-1] if collected_text else None
+
+            choice = (data.get("choices") or [{}])[0]
+            msg = choice.get("message", {})
+            finish_reason = choice.get("finish_reason", "")
+
+            # 收集文本
+            text_content = msg.get("content", "")
+            if text_content:
+                collected_text.append(text_content)
+
+            # 检查 tool_calls
+            tool_calls = msg.get("tool_calls", [])
+            if finish_reason == "stop" or not tool_calls:
+                return text_content.strip() if text_content else None
+
+            # 追加 assistant 消息
+            messages.append({
+                "role": "assistant",
+                "content": text_content,
+                "tool_calls": tool_calls if tool_calls else None,
+            })
+
+            # 执行每个 tool_call 并追加 tool 消息
+            for tc in tool_calls:
+                func_info = tc.get("function", {})
+                tool_name = func_info.get("name", "")
+                try:
+                    arguments = json.loads(func_info.get("arguments", "{}"))
+                except json.JSONDecodeError:
+                    arguments = {}
+                try:
+                    result_str = tool_handler(tool_name, arguments)
+                except Exception as exc:
+                    result_str = f"工具执行异常: {type(exc).__name__}: {exc}"
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.get("id", ""),
+                    "content": result_str,
+                })
+
+    # 达到 max_rounds，返回最后一轮累积文本
+    return collected_text[-1] if collected_text else None
+
+
 def check_api_key_available(enable_dotenv=True):
     """Check if API key is available and return guidance if not."""
     if enable_dotenv:

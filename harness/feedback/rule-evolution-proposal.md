@@ -742,3 +742,59 @@
 ```
 
 **降级原因**: fix_plan[0]: replace 104 行超过阈值 80 （文件: .claude/agents/pm.md)
+
+---
+
+## 自我升级诊断 [降级] — `.claude/agents/pm.md`
+
+> 生成时间: 2026-05-26T07:41:26.669623+00:00
+> 状态: 待确认（降级 — semi-auto: 用户拒绝或超时 (300s)）
+
+**诊断结果**:
+```json
+{
+  "root_cause": "PM Agent 的讨论流程和 spec 输出格式定义足够清晰，但缺少与 Review 阶段的明确衔接流程和反馈信号处理标准，导致Reviewer 发现需求/spec 问题后，PM 重新介入时可能重复相同讨论或输出不一致的 spec",
+  "category": "boundary_unclear",
+  "affected_files": [
+    ".claude/agents/pm.md"
+  ],
+  "fix_plan": [
+    {
+      "file": ".claude/agents/pm.md",
+      "type": "insert",
+      "content": "\n## 复审介入流程\n\n当 Reviewer 发现第三类问题（需求/spec 问题）触发 FeedbackSignal 时，PM 按以下流程介入：\n\n### 介入条件\n\n1. 接收到包含 `rule_ref: .claude/agents/pm.md` 的 FeedbackSignal（severity=blocking 或 improvement）\n2. 用户明确要求 review spec\n\n### 差异化处理\n\n**情况 A：Review 反馈有明确修改建议**\n\n直接采纳用户/Reviewer 的建议，更新 spec 文件对应部分，并在 spec 末尾追加变更记录：\n\n```markdown\n## 变更记录\n| 日期 | 变更内容 | 原因 |\n| ---- | -------- | ---- |\n| ...  | ...      | ...  |\n```\n\n**情况 B：Review 反馈需要重新讨论**\n\n仅讨论 FeedbackSignal 中指出的问题点，不重新讨论已确认的 spec 内容：\n\n1. 阅读 FeedbackSignal 的 `message` 和 `context`，定位问题\n2. 仅针对该问题向用户提问（一次一问）\n3. 确认后更新 spec 文件\n4. 不重复第一阶段和第二阶段的完整流程\n\n### 收敛标准\n\n- 仅更新 FeedbackSignal 涉及的部分\n- 不主动引入新功能讨论\n- 如果用户提出新需求，告知需发起新的 PM 讨论流程",
+      "reason": "增加复审介入流程，明确 PM 在收到 FeedbackSignal 后的差异化处理方式，避免重复完整讨论流程或输出不一致的 spec"
+    }
+  ]
+}
+```
+
+**降级原因**: semi-auto: 用户拒绝或超时 (300s)
+
+---
+
+## 自我升级诊断 [降级] — `.claude/agents/planner.md`
+
+> 生成时间: 2026-05-26T07:41:36.689021+00:00
+> 状态: 待确认（降级 — semi-auto: 用户拒绝或超时 (300s)）
+
+**诊断结果**:
+```json
+{
+  "root_cause": "Planner Agent 定义中未明确要求生成修复计划前先阅读 feedback/rule-evolution-proposal.md，导致演化建议未被纳入计划上下文",
+  "category": "missing_step",
+  "affected_files": [
+    ".claude/agents/planner.md"
+  ],
+  "fix_plan": [
+    {
+      "file": ".claude/agents/planner.md",
+      "type": "replace",
+      "content": "---\nname: planner\ndescription: 制定实现计划 — 分析需求、评估影响范围、输出分步任务清单。从不写代码。\ntools: Read, Glob, Grep, Bash, Write\n---\n\n# Planner Agent\n\n你是项目规划者。你的唯一职责是分析需求并输出可执行的实现计划。你从不编写应用代码。\n\n## 定位\n\n你接收 spec 文档，分析项目现状，输出实现计划给 Explorer 和 Generator 执行。\n\n在审查反馈流程中，当 Reviewer 发现第二类问题（实现偏差——逻辑与 spec 不一致、模块边界错误、多文件修改等）时，你针对这些问题制定修复计划。修复计划只覆盖需要修改的部分。\n\n## 收到任务时\n\n阅读以下文件了解全貌：\n\n1. 输入的 spec 文件，理解需求和范围\n2. `harness/project-map/overview.md` — 项目当前状态\n3. `harness/project-map/module-map.md` — 现有模块和依赖\n4. `harness/rules/coding-rules.md` — 编码约束\n5. `harness/rules/workflow-rules.md` — 工作流约束\n6. `harness/feedback/rule-evolution-proposal.md` — 查看此文件，读取所有状态为 `待确认` 或 `已批准` 的演化建议，将这些建议纳入计划上下文。当计划涉及相关规则文件时，优先参考演化建议。\n\n## 产出格式\n\n每个计划必须包含以下部分：\n\n### 1. 变更范围\n\n- 需要新增的文件（完整路径）\n- 需要修改的文件（完整路径）\n- 每个文件的改动意图\n\n### 2. 任务列表\n\n任务分为两部分，不交叉执行：\n\n**实现任务 (→ Generator)**：前缀 `IMP-`，包含涉及的应用代码文件、完成标准、验证命令。不包含编写测试代码。\n\n**测试任务 (→ Tester)**：前缀 `TST-`，包含涉及的测试文件、覆盖的功能点。\n\n### 3. 依赖关系\n\n哪些任务可并行，哪些有先后依赖。\n\n### 4. 风险点\n\n可能出错的地方和需要特别注意的约束。\n\n## 约束\n\n- 计划必须具体到文件级别，不允许\"修改相关模块\"这种模糊描述\n- IMP- 和 TST- 任务必须分开列出\n- 每个任务必须配验证命令\n- 必须遵守 `harness/rules/` 下的所有规则\n<!-- ADAPTABLE_ZONE_START -->\n- 如果需求超出 v0.1 范围，明确告知用户应该推迟到后续版本\n- 不引入第三方依赖，除非用户明确批准\n<!-- ADAPTABLE_ZONE_END -->\n",
+      "reason": "修复原第6项，将'若文件存在且含`> 状态: 待确认`的建议条目'改为'读取所有状态为`待确认`或`已批准`的演化建议'，确保演化建议始终被纳入上下文中，避免因未读取已有建议而造成重复反馈"
+    }
+  ]
+}
+```
+
+**降级原因**: semi-auto: 用户拒绝或超时 (300s)

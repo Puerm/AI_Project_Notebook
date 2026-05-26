@@ -162,6 +162,52 @@ target_path/
 
 ---
 
+## CodeGraph 增强分析流水线 (v0.5.2 --codegraph)
+
+```
+target_path/
+    │
+    ├── [codegraph/1] 数据库检测 (codegraph.py)
+    │   └── detect_codegraph_db(target_path) → db_path | None
+    │       └── 不存在时打印指导信息，降级为普通分析流程
+    │
+    ├── [codegraph/2] Schema 提取 (codegraph.py)
+    │   ├── connect_codegraph_db(db_path) → sqlite3.Connection (只读)
+    │   └── extract_schema_summary(conn) → {tables, language_stats}
+    │       └── format_schema_for_llm(schema) → Markdown 文本
+    │
+    ├── [codegraph/3] LLM tool-use 多轮探索 (llm_assistant.py)
+    │   ├── _call_llm_with_tools(schema_text + query_codegraph tool)
+    │   │   ├── LLM 收到 schema 摘要 → 决定查询方向
+    │   │   ├── LLM 调用 query_codegraph(sql) → execute_query() 执行只读 SELECT
+    │   │   ├── 结果追加到对话上下文 → LLM 继续探索或输出总结
+    │   │   └── 最多 5 轮, 每轮结果截断 200 行
+    │   └── 返回探索结果文本 (codegraph_context)
+    │
+    ├── [codegraph/4] context 注入 (analyze_project.py)
+    │   ├── domain_analyzer: analyze_business_domains(..., codegraph_context)
+    │   │   └── prompt 末尾追加 "# CodeGraph 符号知识图谱发现" 段落
+    │   └── dimension_analyzer: analyze_architecture/user_stories/risk(..., codegraph_context)
+    │       └── prompt 末尾追加 CodeGraph 上下文 + 维度特定的分析引导
+    │
+    └── 降级兼容:
+        ├── --codegraph 未启用 → 行为与现有版本完全一致
+        ├── 无 .codegraph/codegraph.db → 提示安装指导，继续分析
+        └── LLM 不可用 → 返回 None，分析以无 CodeGraph 上下文继续
+```
+
+### codegraph.py 返回值
+
+| 函数 | 返回值 |
+| ---- | ---- |
+| detect_codegraph_db | str (db 路径) \| None |
+| connect_codegraph_db | sqlite3.Connection (只读) |
+| extract_schema_summary | dict {tables: [...], language_stats: {...}} |
+| execute_query | list[dict] (最多 200 行) |
+| format_schema_for_llm | str (Markdown 格式 schema 文本) |
+
+---
+
 ## 反馈信号与工作流状态
 
 ### FeedbackSignal (feedback_signal.py 输出)

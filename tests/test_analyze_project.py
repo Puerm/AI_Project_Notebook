@@ -1155,3 +1155,245 @@ class TestDigestCLIE2E:
             for k, v in saved.items():
                 os.environ[k] = v
             shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ===========================================================================
+# TST-2: CodeGraph CLI 集成测试
+# ===========================================================================
+
+
+class TestCodegraphCLIHelp:
+    """analyze_project.py --codegraph --help 参数输出"""
+
+    def test_help_output_contains_codegraph(self):
+        """--help 输出含 --codegraph 参数说明"""
+        result = _run_cli("--help")
+        assert result.returncode == 0
+        assert "--codegraph" in result.stdout, (
+            f"Expected --codegraph in help output, got:\n{result.stdout[:500]}"
+        )
+        assert "CodeGraph" in result.stdout
+
+    def test_codegraph_help_with_digest(self):
+        """--digest --help 输出同时包含 --codegraph"""
+        result = _run_cli("--digest", "--help")
+        assert result.returncode == 0
+        assert "--codegraph" in result.stdout
+
+
+class TestCodegraphCLIDegraded:
+    """--codegraph 降级兼容测试（无 .codegraph/ 目录）"""
+
+    def test_no_codegraph_dir_outputs_guidance(self):
+        """无 .codegraph/ 目录时输出提示信息且退出码为 0"""
+        saved = {}
+        for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE", "LLM_MODEL"):
+            if k in os.environ:
+                saved[k] = os.environ.pop(k)
+
+        run_env = _SUBPROCESS_ENV.copy()
+        run_env["LLM_API_KEY"] = "fake-test-key"
+        run_env["LLM_API_BASE"] = "http://127.0.0.1:1"
+
+        tmp = _make_tmpdir()
+        try:
+            _write_file(tmp, "main.py", "print('hello')\n")
+            result = subprocess.run(
+                [sys.executable, CLI_SCRIPT, tmp, "--codegraph"],
+                capture_output=True, encoding="utf-8", env=run_env,
+            )
+            assert result.returncode == 0, (
+                f"Exit {result.returncode}, stderr: {result.stderr}"
+            )
+            # Should output guidance about missing codegraph db
+            output = result.stdout + result.stderr
+            assert ".codegraph" in output or "CodeGraph" in output, (
+                f"Expected codegraph guidance, got:\n{output[:500]}"
+            )
+        finally:
+            for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE",
+                      "LLM_MODEL"):
+                os.environ.pop(k, None)
+            for k, v in saved.items():
+                os.environ[k] = v
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_no_codegraph_dir_quiet_silent(self):
+        """--codegraph --quiet 无 .codegraph/ 目录时安静执行退出码 0"""
+        saved = {}
+        for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE", "LLM_MODEL"):
+            if k in os.environ:
+                saved[k] = os.environ.pop(k)
+
+        run_env = _SUBPROCESS_ENV.copy()
+        run_env["LLM_API_KEY"] = "fake-test-key"
+        run_env["LLM_API_BASE"] = "http://127.0.0.1:1"
+
+        tmp = _make_tmpdir()
+        try:
+            _write_file(tmp, "main.py", "print('hello')\n")
+            result = subprocess.run(
+                [sys.executable, CLI_SCRIPT, tmp, "--codegraph", "--quiet"],
+                capture_output=True, encoding="utf-8", env=run_env,
+            )
+            assert result.returncode == 0, (
+                f"Exit {result.returncode}, stderr: {result.stderr}"
+            )
+            # In quiet mode, no codegraph message on stdout
+            assert "CodeGraph" not in result.stdout
+        finally:
+            for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE",
+                      "LLM_MODEL"):
+                os.environ.pop(k, None)
+            for k, v in saved.items():
+                os.environ[k] = v
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_codegraph_degraded_still_generates_overview(self):
+        """--codegraph 降级模式下仍生成 project-overview.md"""
+        saved = {}
+        for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE", "LLM_MODEL"):
+            if k in os.environ:
+                saved[k] = os.environ.pop(k)
+
+        run_env = _SUBPROCESS_ENV.copy()
+        run_env["LLM_API_KEY"] = "fake-test-key"
+        run_env["LLM_API_BASE"] = "http://127.0.0.1:1"
+
+        tmp = _make_tmpdir()
+        try:
+            _write_file(tmp, "README.md", "# CodeGraph Degraded Test\n")
+            os.makedirs(os.path.join(tmp, "src"), exist_ok=True)
+            _write_file(tmp, "src/main.py", "print('hello')\n")
+
+            result = subprocess.run(
+                [sys.executable, CLI_SCRIPT, tmp, "--codegraph", "--quiet"],
+                capture_output=True, encoding="utf-8", env=run_env,
+            )
+            assert result.returncode == 0, (
+                f"Exit {result.returncode}, stderr: {result.stderr}"
+            )
+            overview_path = os.path.join(tmp, "harness", "project-map",
+                                          "project-overview.md")
+            assert os.path.isfile(overview_path), (
+                f"project-overview.md not found at {overview_path}"
+            )
+        finally:
+            for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE",
+                      "LLM_MODEL"):
+                os.environ.pop(k, None)
+            for k, v in saved.items():
+                os.environ[k] = v
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+class TestCodegraphCLIDigestCombo:
+    """--digest --codegraph --quiet 组合参数测试"""
+
+    def test_digest_codegraph_quiet_exits_zero(self):
+        """--digest --codegraph --quiet 组合不冲突，退出码为 0"""
+        saved = {}
+        for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE", "LLM_MODEL"):
+            if k in os.environ:
+                saved[k] = os.environ.pop(k)
+
+        run_env = _SUBPROCESS_ENV.copy()
+        run_env["LLM_API_KEY"] = "fake-test-key"
+        run_env["LLM_API_BASE"] = "http://127.0.0.1:1"
+
+        tmp = _make_tmpdir()
+        try:
+            _write_file(tmp, "README.md", "# Digest+CodeGraph Test\n")
+            os.makedirs(os.path.join(tmp, "src"), exist_ok=True)
+            _write_file(tmp, "src/main.py", "print('hello')\n")
+
+            result = subprocess.run(
+                [sys.executable, CLI_SCRIPT, tmp, "--digest", "--codegraph",
+                 "--quiet"],
+                capture_output=True, encoding="utf-8", env=run_env,
+            )
+            assert result.returncode == 0, (
+                f"Exit {result.returncode}, stderr: {result.stderr}"
+            )
+            overview_path = os.path.join(tmp, "harness", "project-map",
+                                          "project-overview.md")
+            assert os.path.isfile(overview_path), (
+                f"project-overview.md not found at {overview_path}"
+            )
+        finally:
+            for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE",
+                      "LLM_MODEL"):
+                os.environ.pop(k, None)
+            for k, v in saved.items():
+                os.environ[k] = v
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+class TestCodegraphCLIRegression:
+    """--codegraph 未启用时回归测试：现有行为不变"""
+
+    def test_no_codegraph_flag_default_mode_still_works(self):
+        """不启用 --codegraph 时默认模式正常生成 project-overview.md"""
+        saved = {}
+        for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE", "LLM_MODEL"):
+            if k in os.environ:
+                saved[k] = os.environ.pop(k)
+
+        run_env = _SUBPROCESS_ENV.copy()
+        run_env["LLM_API_KEY"] = "fake-test-key"
+        run_env["LLM_API_BASE"] = "http://127.0.0.1:1"
+
+        tmp = _make_tmpdir()
+        try:
+            _write_file(tmp, "README.md", "# Regression Test\n")
+            os.makedirs(os.path.join(tmp, "src"), exist_ok=True)
+            _write_file(tmp, "src/main.py", "print('hello')\n")
+
+            result = subprocess.run(
+                [sys.executable, CLI_SCRIPT, tmp, "--quiet"],
+                capture_output=True, encoding="utf-8", env=run_env,
+            )
+            assert result.returncode == 0
+            overview_path = os.path.join(tmp, "harness", "project-map",
+                                          "project-overview.md")
+            assert os.path.isfile(overview_path)
+        finally:
+            for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE",
+                      "LLM_MODEL"):
+                os.environ.pop(k, None)
+            for k, v in saved.items():
+                os.environ[k] = v
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_no_codegraph_flag_digest_mode_still_works(self):
+        """不启用 --codegraph 时 --digest 模式正常生成 project-overview.md"""
+        saved = {}
+        for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE", "LLM_MODEL"):
+            if k in os.environ:
+                saved[k] = os.environ.pop(k)
+
+        run_env = _SUBPROCESS_ENV.copy()
+        run_env["LLM_API_KEY"] = "fake-test-key"
+        run_env["LLM_API_BASE"] = "http://127.0.0.1:1"
+
+        tmp = _make_tmpdir()
+        try:
+            _write_file(tmp, "README.md", "# Digest Regression\n")
+            os.makedirs(os.path.join(tmp, "src"), exist_ok=True)
+            _write_file(tmp, "src/main.py", "print('hello')\n")
+
+            result = subprocess.run(
+                [sys.executable, CLI_SCRIPT, tmp, "--digest", "--quiet"],
+                capture_output=True, encoding="utf-8", env=run_env,
+            )
+            assert result.returncode == 0
+            overview_path = os.path.join(tmp, "harness", "project-map",
+                                          "project-overview.md")
+            assert os.path.isfile(overview_path)
+        finally:
+            for k in ("LLM_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_BASE",
+                      "LLM_MODEL"):
+                os.environ.pop(k, None)
+            for k, v in saved.items():
+                os.environ[k] = v
+            shutil.rmtree(tmp, ignore_errors=True)

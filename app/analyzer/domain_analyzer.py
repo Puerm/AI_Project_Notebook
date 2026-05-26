@@ -6,7 +6,7 @@ from app.analyzer.llm_assistant import _get_llm_config, _call_llm
 
 
 def analyze_business_domains(guiding_files_result, dir_summary, project_name,
-                             enable_dotenv=True):
+                             enable_dotenv=True, codegraph_context=None):
     """识别项目的业务板块（用户视角的功能领域）。
 
     Args:
@@ -25,6 +25,9 @@ def analyze_business_domains(guiding_files_result, dir_summary, project_name,
     prompt = _build_domain_analysis_prompt(
         guiding_files_result, dir_summary, project_name
     )
+
+    if codegraph_context:
+        prompt += f"\n\n# CodeGraph 符号知识图谱发现\n\n{codegraph_context}\n\n请综合以上图谱发现优化业务板块识别，特别是调用关系/模块依赖信息。"
 
     result = _call_llm(
         system_prompt=(

@@ -4,6 +4,20 @@
 
 ## 变更记录
 
+### 2026-05-26: CodeGraph 集成 — 图谱增强项目分析
+
+- **类型**: 新功能
+- **范围**: 1 新建 + 4 修改 + 4 文档更新
+- **摘要**: 实现 CodeGraph 符号知识图谱集成，新增 `--codegraph` 选项增强 LLM 项目分析质量
+  - **IMP-1**: 新建 `app/analyzer/codegraph.py` — db 检测、Schema 提取、只读 SELECT 查询、Markdown 格式化
+  - **IMP-2**: `llm_assistant.py` — 新增 `_call_llm_with_tools()` 函数，支持 Anthropic/OpenAI tool use 多轮探索（最多 5 轮）
+  - **IMP-3**: `analyze_project.py` — 新增 `--codegraph` CLI 参数，非 digest 模式 Step 1.5 / digest 模式 Step 3.5 插入 CodeGraph 探索阶段，探索结果作为 `codegraph_context` 注入 domain/dimension 分析
+  - **IMP-4**: `domain_analyzer.py` — `analyze_business_domains()` 新增可选参数 `codegraph_context`，非空时追加到 LLM prompt
+  - **IMP-5**: `dimension_analyzer.py` — 三个分析函数各新增可选参数 `codegraph_context`，非空时追加维度特定的 CodeGraph 上下文引导
+  - **IMP-6**: project-map 文档同步更新 (module-map/directory-map/command-map/data-flow/change-map)
+- **影响文件**: `app/analyzer/codegraph.py` (新), `app/analyzer/llm_assistant.py`, `app/analyzer/domain_analyzer.py`, `app/analyzer/dimension_analyzer.py`, `app/analyze_project.py`, `harness/project-map/module-map.md`, `harness/project-map/directory-map.md`, `harness/project-map/command-map.md`, `harness/project-map/data-flow.md`
+- **验证**: `python harness/scripts/check_structure.py` 52/52 通过
+
 ### 2026-05-26: deploy 脚本集成 init 流水线 — 读取 project.yaml 基线
 
 - **类型**: 增强
@@ -443,6 +457,18 @@
   - 创建结构检查脚本 `check_structure.py`
 - **影响文件**: 全部为新建
 - **验证**: `python harness/scripts/check_structure.py` 通过
+
+---
+
+### 2026-05-26: CodeGraph 集成 generator-fix — 审查反馈修复 (3 个问题)
+
+- **类型**: 修复
+- **范围**: `app/analyzer/llm_assistant.py`, `app/analyze_project.py`, `README.md`
+- **摘要**: 修复 Reviewer 发现的 3 个第一类问题
+  - `_call_llm_with_tools()` 多行 docstring 改为单行 (coding-rule 13)
+  - `_run_codegraph_exploration()` 多行 docstring 改为单行 (coding-rule 13)
+  - `README.md` 补充遗漏的 `--codegraph` 使用示例 (coding-rule 5)
+- **验证**: `python harness/scripts/check_structure.py` 52/52 PASS
 
 ---
 

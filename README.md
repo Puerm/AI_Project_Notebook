@@ -37,6 +37,9 @@ python app/analyze_project.py <目标路径>
 pip install codebase-digest
 python app/analyze_project.py <目标路径> --digest
 
+# CodeGraph 图谱增强分析（需预先安装 CodeGraph 并完成索引，可与 --digest 组合使用）
+python app/analyze_project.py <目标路径> --codegraph
+
 # 规则演化检查（扫描反馈信号，检测重复模式，不依赖 LLM）
 python harness/scripts/generate_rule_evolution.py
 

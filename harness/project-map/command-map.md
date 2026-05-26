@@ -13,7 +13,7 @@
 | `python harness/scripts/generate_rule_evolution.py` | 扫描反馈信号，生成规则演化建议 | `harness/scripts/generate_rule_evolution.py` |
 | `python harness/scripts/diagnose_and_fix.py` | 自我升级引擎 — 扫描反馈信号的重复模式，自动诊断并应用修复（沙盒验证） | `harness/scripts/diagnose_and_fix.py` |
 | `python harness/scripts/harness_deploy.py <目标路径>` | Harness 框架个性化部署 — LLM 检测新项目并生成适配建议，交互式确认 | `harness/scripts/harness_deploy.py` |
-| `python app/analyze_project.py <目标路径>` | 智能项目分析引擎 (v0.5.1: 渐进式披露 / --digest 聚焦三维度分析) [--digest] [--max-size N] | `app/analyze_project.py` |
+| `python app/analyze_project.py <目标路径>` | 智能项目分析引擎 (v0.5.1: 渐进式披露 / --digest 聚焦三维度分析 / --codegraph 图谱增强) [--digest] [--max-size N] [--codegraph] | `app/analyze_project.py` |
 
 ## Claude Code 命令
 

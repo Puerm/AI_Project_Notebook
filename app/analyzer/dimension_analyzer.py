@@ -190,7 +190,8 @@ def _degraded_risk(project_name):
 """
 
 
-def analyze_architecture(filtered_files, project_name, output_dir, enable_dotenv=True):
+def analyze_architecture(filtered_files, project_name, output_dir, enable_dotenv=True,
+                        codegraph_context=None):
     """聚焦架构分析，接收筛选后的文件子集，写入 analysis/architecture.md。"""
     available, config = _check_llm_available(enable_dotenv)
 
@@ -200,6 +201,12 @@ def analyze_architecture(filtered_files, project_name, output_dir, enable_dotenv
         return {"file_path": file_path, "status": "degraded", "content": content}
 
     user_prompt = _build_architecture_prompt_from_files(filtered_files, project_name)
+    if codegraph_context:
+        user_prompt += (
+            f"\n\n# CodeGraph 符号知识图谱发现\n\n{codegraph_context}\n\n"
+            "请利用以上调用链/符号关系数据增强架构分析，特别关注：真正的分层边界、关键模块依赖、"
+            "调用热路径上的核心接口。"
+        )
     result = _call_llm_with_retry(
         system_prompt="你是一位资深软件架构师，擅长从代码中识别架构模式并生成结构化的架构分析报告。输出完整的 Markdown 文档。",
         user_prompt=user_prompt,
@@ -218,7 +225,8 @@ def analyze_architecture(filtered_files, project_name, output_dir, enable_dotenv
     return {"file_path": file_path, "status": "llm", "content": full_content}
 
 
-def analyze_user_stories(filtered_files, arch_md_text, project_name, output_dir, enable_dotenv=True):
+def analyze_user_stories(filtered_files, arch_md_text, project_name, output_dir, enable_dotenv=True,
+                        codegraph_context=None):
     """聚焦用户故事重建，接收筛选后的文件子集，写入 analysis/user-stories.md。"""
     available, config = _check_llm_available(enable_dotenv)
 
@@ -228,6 +236,12 @@ def analyze_user_stories(filtered_files, arch_md_text, project_name, output_dir,
         return {"file_path": file_path, "status": "degraded", "content": content}
 
     user_prompt = _build_stories_prompt_from_files(filtered_files, arch_md_text, project_name)
+    if codegraph_context:
+        user_prompt += (
+            f"\n\n# CodeGraph 符号知识图谱发现\n\n{codegraph_context}\n\n"
+            "请利用以上符号关系数据重建用户故事中的功能依赖链，"
+            "识别关键入口函数到最终输出的完整调用路径。"
+        )
     result = _call_llm_with_retry(
         system_prompt="你是一位资深产品经理，擅长从代码仓库中反向重建用户故事。每个故事必须有代码证据。输出完整的 Markdown 文档。",
         user_prompt=user_prompt,
@@ -246,7 +260,8 @@ def analyze_user_stories(filtered_files, arch_md_text, project_name, output_dir,
     return {"file_path": file_path, "status": "llm", "content": full_content}
 
 
-def analyze_risk(filtered_files, arch_md_text, stories_md_text, project_name, output_dir, enable_dotenv=True):
+def analyze_risk(filtered_files, arch_md_text, stories_md_text, project_name, output_dir, enable_dotenv=True,
+                codegraph_context=None):
     """聚焦风险分析，接收筛选后的文件子集，写入 analysis/risk-analysis.md。"""
     available, config = _check_llm_available(enable_dotenv)
 
@@ -256,6 +271,12 @@ def analyze_risk(filtered_files, arch_md_text, stories_md_text, project_name, ou
         return {"file_path": file_path, "status": "degraded", "content": content}
 
     user_prompt = _build_risk_prompt_from_files(filtered_files, arch_md_text, stories_md_text, project_name)
+    if codegraph_context:
+        user_prompt += (
+            f"\n\n# CodeGraph 符号知识图谱发现\n\n{codegraph_context}\n\n"
+            "请利用以上符号关系数据识别高风险调用路径和耦合热点，"
+            "特别关注：循环依赖、高扇出模块、关键路径上的单点故障。"
+        )
     result = _call_llm_with_retry(
         system_prompt="你是一位资深代码审查专家和安全工程师，擅长发现代码中的潜在错误和安全风险。输出完整的 Markdown 文档。",
         user_prompt=user_prompt,
