@@ -48,7 +48,7 @@ Generator ──(代码变更)──▶  Reviewer ──(审查报告)──▶ 
 
 ### 验证完整性
 
-- `check_structure.py` 是否通过？
+- 项目配置的结构验证命令是否通过？
 - 相关测试是否存在并通过？
 - `change-map.md` 是否已更新？
 

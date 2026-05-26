@@ -115,7 +115,7 @@ def _degraded_architecture(project_name):
 
 ## 改进建议
 1. 配置 LLM API Key (ANTHROPIC_API_KEY) 以获取完整的架构分析
-2. 使用 `python harness/scripts/analyze_project.py <路径> --digest` 重新分析
+2. 使用 `python app/analyze_project.py <路径> --digest` 重新分析
 """
 
 
@@ -132,8 +132,7 @@ def _degraded_user_stories(project_name):
 以下为检测到的入口文件（可能对应主要功能）：
 
 - `harness/scripts/help.py` — 打印可用命令
-- `harness/scripts/check_structure.py` — 检查项目结构
-- `harness/scripts/analyze_project.py` — 项目分析引擎
+- `app/analyze_project.py` — 项目分析引擎
 - `harness/scripts/search_notes.py` — 搜索笔记
 - `harness/scripts/export_report.py` — 导出报告
 - `harness/scripts/init_project.py` — 初始化项目
@@ -143,7 +142,7 @@ def _degraded_user_stories(project_name):
 
 ## 技术支持故事
 1. 配置 LLM API Key 以获取完整的用户故事重建
-2. 使用 `python harness/scripts/analyze_project.py <路径> --digest` 重新分析
+2. 使用 `python app/analyze_project.py <路径> --digest` 重新分析
 
 > 上下文引用: 参见 [architecture.md](architecture.md) 了解项目架构概览。
 """
@@ -182,7 +181,7 @@ def _degraded_risk(project_name):
 
 ## 缓解建议
 1. 配置 LLM API Key (ANTHROPIC_API_KEY) 以获取完整的风险分析
-2. 使用 `python harness/scripts/analyze_project.py <路径> --digest` 重新分析
+2. 使用 `python app/analyze_project.py <路径> --digest` 重新分析
 
 > 上下文引用: 参见 [architecture.md](architecture.md) 和 [user-stories.md](user-stories.md) 了解项目上下文。
 """

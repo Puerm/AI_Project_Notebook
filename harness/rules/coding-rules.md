@@ -6,7 +6,7 @@
 
 1. 新增模块前必须在 `harness/project-map/module-map.md` 中登记模块名称、用途、依赖
 2. 新增目录后必须在 `harness/project-map/directory-map.md` 中更新目录结构
-3. 文件命名：Python 用 `snake_case.py`，Markdown 用 `kebab-case.md`
+3. 文件命名遵循项目约定的命名规范
 4. 每个 Python 脚本必须在文件头 3 行内包含一行描述其用途的注释
 
 ## 代码变更
@@ -14,13 +14,13 @@
 5. 修改 CLI 命令后必须同步更新 `README.md` 和 `harness/project-map/command-map.md`
 6. 修改数据结构（类字段、文件格式）后必须同步更新 `harness/project-map/data-flow.md`
 7. 修改公开函数签名后必须更新 `harness/project-map/module-map.md` 中对应的接口说明
-8. 任何代码修改后必须运行 `python harness/scripts/check_structure.py` 确认结构完整
+8. 任何代码修改后必须运行项目配置的结构验证命令
 
 ## 测试
 
 9. 新增功能必须在 `tests/` 下添加对应的测试文件
 10. 测试文件命名：`test_<模块名>.py`
-11. 修改代码后必须运行相关测试：`python -m pytest tests/ -v`
+11. 修改代码后必须运行相关测试：{{test_command}}
 
 ## 注释
 

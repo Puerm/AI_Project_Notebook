@@ -18,11 +18,13 @@
 | app\analyzer\scanner.py | EXCLUDE_DIRS 常量（目录排除规则） | _infer_dir_label, scan_directory, detect_source_root, detect_source_roots | - |
 | app\analyzer\parser.py | ~~已移除~~ — 不再被导入 | parse_python, check_nodejs, _parse_js_regex | - |
 | app\analyzer\overview.py | ~~已移除~~ — 不再被导入 | analyze_overview, _detect_tech_stack, _detect_entry_files | - |
+| app\analyze_project.py | 智能项目分析引擎入口 v0.5.1 — 渐进式披露 + digest 聚焦三维度分析 | main | - |
 | harness\state\feedback_signal.py | 反馈信号数据模型 | to_dict, from_dict, to_json_schema | FeedbackSignal |
 | harness\state\feedback_engine.py | 反馈信号引擎（读写/去重/模式检测） | load_signals, add_signal, save_signals, detect_patterns | FeedbackEngine |
 | harness\state\workflow_state.py | 工作流状态管理器（偏差趋势/回环决策） | init, record_stage, get_deviation_trend, should_continue_loop, to_feedback_signal | WorkflowState |
 | harness\scripts\generate_rule_evolution.py | 规则演化建议生成脚本 | - | - |
 | harness\scripts\diagnose_and_fix.py | 自我升级引擎 — 反馈信号驱动的自动诊断与修复 | main, _load_config, _check_dedup, _apply_safety_boundary, _call_llm_diagnosis, _sandbox_verify, _write_upgrade_history | - |
+| harness\config\project.yaml | 项目模板变量定义 — 所有占位符 {{...}} 的单一数据源 | - | - |
 | tests\test_export_report.py | 导出报告测试 | test_export_report_runs_and_returns_zero, test_export_report_contains_expected_sections, test_export_report_sections_have_numbered_source_labels | - |
 | tests\test_help.py | help 命令测试 | test_help_runs_and_returns_zero, test_help_lists_all_commands | - |
 | tests\test_init_project.py | 初始化项目测试 | test_init_project_creates_harness_dir, test_init_project_generates_directory_map_with_tree, test_init_project_refuses_existing_harness, test_init_project_refuses_nonexistent_path, test_init_project_missing_argument_exits_one | - |

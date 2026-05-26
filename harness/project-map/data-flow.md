@@ -189,11 +189,34 @@ feedback-signals.json
     │
     ├── 修复方案（JSON）
     │   ├── 安全边界通过 + auto → git worktree 沙盒验证
-    │   │   ├── check_structure.py 通过
     │   │   ├── pytest 通过
     │   │   ├── agent YAML 有效 → 合并到主分支 + 升级历史
     │   │   └── 任一失败 → 丢弃沙盒 + 降级输出
     │   └── 安全边界不通过 / semi-auto 拒绝 → rule-evolution-proposal.md
     │
     └── upgrade-history.json（每次修复记录）
+```
+
+---
+
+## project.yaml 模板填充数据流 (v0.9)
+
+```
+init_project.py
+    │
+    ├── _detect_project_features() → 项目特征 (languages/test_framework/test_command/package_manager)
+    │   ├── 文件后缀统计 → languages
+    │   ├── 配置文件检测 → package_manager
+    │   └── 测试框架推断 → test_command
+    │
+    ├── _generate_project_yaml() → harness/config/project.yaml
+    │
+    ├── _fill_templates() → 遍历 harness/ 下 .md/.yaml/.txt 文件
+    │   ├── {{project_name}} → project.yaml 中的值
+    │   ├── {{version}} → "0.1"
+    │   ├── {{test_command}} → 检测到的测试命令
+    │   ├── {{validation_command}} → 语言特定的验证命令
+    │   └── {{package_manager}} → 检测到的包管理器
+    │
+    └── 输出: 已填充占位符的部署文件
 ```

@@ -11,7 +11,7 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-CLI_SCRIPT = os.path.join(_PROJECT_ROOT, "harness", "scripts", "analyze_project.py")
+CLI_SCRIPT = os.path.join(_PROJECT_ROOT, "app", "analyze_project.py")
 
 
 def _write_file(dir_path, filename, content):

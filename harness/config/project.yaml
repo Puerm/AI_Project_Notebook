@@ -1,0 +1,11 @@
+# project.yaml — 项目模板变量定义，所有占位符 {{...}} 的单一数据源
+# 部署到目标项目时由 init_project.py 根据 LLM 检测结果生成新值
+
+project_name: AI Project Notebook
+version: "0.9"
+languages:
+  - python
+test_framework: pytest
+test_command: python -m pytest tests/ -v
+package_manager: pip
+validation_command: python harness/scripts/check_structure.py

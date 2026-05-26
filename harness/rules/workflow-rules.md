@@ -17,8 +17,8 @@
 
 ## 验证
 
-7. 代码修改后运行 `python harness/scripts/check_structure.py`
-8. 如果存在测试，运行 `python -m pytest tests/ -v`
+7. 代码修改后运行项目配置的验证命令
+8. 如果存在测试，运行项目配置的测试命令
 9. 检查 `harness/rules/` 下是否有规则被命中，确认没有违反
 
 ## 错误处理

@@ -767,7 +767,7 @@ class TestWorktreeGit:
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_verification_passes_on_valid_worktree(self):
-        """worktree 中 check_structure + agent YAML 验证通过。"""
+        """worktree 中 pytest + agent YAML 两步验证通过。"""
         tmp, project_dir = self._init_temp_git_repo()
         try:
             with patch("harness.scripts.diagnose_and_fix._PROJECT_ROOT", project_dir):
@@ -1296,5 +1296,65 @@ class TestFunnelContext:
             with patch("harness.scripts.diagnose_and_fix._project_path", side_effect=_fake_path):
                 result = _build_funnel_context(target)
             assert "无 funnel 关联文件" in result
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ============================================================
+# TST-3: _run_verification 两步验证测试 (IMP-6)
+# ============================================================
+
+class TestRunVerificationTwoStep:
+    """TST-3: 验证 _run_verification 从三步变为两步后行为正确。"""
+
+    def test_run_verification_docstring_mentions_two_steps(self):
+        """_run_verification docstring 应提及"两步"。"""
+        doc = _run_verification.__doc__
+        assert doc is not None, "_run_verification 缺少 docstring"
+        assert "两步" in doc, (
+            f"_run_verification docstring 应提及'两步'，实际: {doc}"
+        )
+
+    def test_run_verification_no_check_structure_reference(self):
+        """_run_verification 源码中不再含 check_structure.py 调用。"""
+        import inspect
+        source = inspect.getsource(_run_verification)
+        assert "check_structure" not in source, (
+            f"_run_verification 入口不应再调用 check_structure.py，实际源码包含"
+        )
+
+    def test_run_verification_pytest_two_steps_only(self):
+        """_run_verification 仅执行 pytest + agent YAML 两步。
+
+        验证: 在无 tests/ 目录但有有效 agent YAML 的 workspace 中：
+        - pytest 步骤被跳过（无 tests/ 目录）
+        - agent YAML 步骤通过
+        - 整体 passed=True
+        """
+        tmp = tempfile.mkdtemp()
+        try:
+            # 创建有效的 agent 文件（不在 worktree 中，无 tests 目录）
+            agents_dir = os.path.join(tmp, ".claude", "agents")
+            os.makedirs(agents_dir, exist_ok=True)
+            with open(os.path.join(agents_dir, "test_agent.md"), "w", encoding="utf-8") as f:
+                f.write("---\nname: test-agent\ndescription: test\n---\n# Test Agent\n")
+
+            # 不创建 tests/ 目录，pytest 步骤应被跳过
+            passed, failures = _run_verification(tmp)
+            assert passed, f"_run_verification should pass (no tests dir, valid agent), failures: {failures}"
+            assert len(failures) == 0
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_run_verification_no_agents_no_tests_still_passes(self):
+        """既无 tests/ 也无 agents/ 时 _run_verification 返回 True（无可验证内容 = 不阻塞）。"""
+        tmp = tempfile.mkdtemp()
+        try:
+            # 空中目录
+            passed, failures = _run_verification(tmp)
+            assert passed, (
+                f"_run_verification should pass with no tests and no agents, "
+                f"failures: {failures}"
+            )
         finally:
             shutil.rmtree(tmp, ignore_errors=True)

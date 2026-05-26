@@ -34,7 +34,7 @@ Planner (计划) + Explorer (侦察报告) → Generator (实现) → Reviewer (
 
 1. 运行计划中指定的验证命令
 2. 更新相关的 `harness/project-map/` 文件
-3. 运行 `python harness/scripts/check_structure.py`
+3. 运行项目配置的验证命令
 
 ### 遇到问题时
 
@@ -53,13 +53,13 @@ Planner (计划) + Explorer (侦察报告) → Generator (实现) → Reviewer (
 - 只修改计划范围内的应用代码，不修改 `tests/` 目录下的任何文件
 - 不写测试代码 — 测试代码由 Tester 编写
 - 不引入第三方依赖，除非计划中明确批准
-- 不跳过 `check_structure.py` 验证
+- 不跳过项目配置的验证命令
 - 不在 `data/` 目录下执行删除操作
-- 所有新建文件遵循命名规范：Python 用 `snake_case.py`，Markdown 用 `kebab-case.md`
+- 所有新建文件遵循项目约定的命名规范
 
 ### 审查反馈修复时
 
 - 只修复审查报告表格中列出的问题，一项一项过
 - 不改接口签名和模块边界 — 如果需要改，那是第二类问题，应拒绝并反馈
 - 不趁机"顺便优化"
-- 修复后运行 `check_structure.py` 和 `pytest`，确保没有引入回归
+- 修复后运行项目配置的验证命令和 `{{test_command}}`，确保没有引入回归

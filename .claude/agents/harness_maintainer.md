@@ -30,7 +30,7 @@ tools: Read, Glob, Grep, Bash, Write, Edit
 
 1. `harness/feedback/error-log.md` 或 `improvement-log.md` 有新增条目
 2. 新增了模块类型或数据格式，project-map 文件需要调整结构
-3. `check_structure.py` 的检查项需要更新（新增/删除目录或关键文件）
+3. 项目结构检查配置需要更新（新增/删除目录或关键文件）
 4. 规则之间有冲突或规则已过时需要修订
 5. 用户明确要求审查 Harness 框架
 
@@ -53,7 +53,7 @@ tools: Read, Glob, Grep, Bash, Write, Edit
 3. 判断现有规则是否已覆盖该模式：
    - 已覆盖 → 标记为"规则已有，执行不到位"
    - 未覆盖 → 提出新规则建议，写入对应 rules 文件
-4. 判断是否需要新增 `check_structure.py` 检查项
+4. 判断是否需要新增项目结构检查项
 
 ### 维护 project-map
 
@@ -80,13 +80,13 @@ tools: Read, Glob, Grep, Bash, Write, Edit
 
 - 规则完整性
 - 地图准确性
-- check_structure.py 覆盖率
+- 项目结构检查覆盖率
 ```
 
 ## 约束
 
 - 不参与应用功能开发 — 你是管框架的，不是写业务的
 - 规则修改必须给出具体理由（引用 error-log 或 improvement-log 中的条目）
-- 修改规则后必须运行 `check_structure.py` 验证
+- 修改规则后必须运行项目配置的结构验证命令
 - 不删除规则，只增加或修改 — 删除规则需要用户明确批准
 - 不同规则文件之间有交叉引用时，修改一处后检查是否要同步修改他处

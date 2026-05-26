@@ -1,4 +1,5 @@
 # analyze_project.py — 智能项目分析引擎 v0.5.1 渐进式披露 + digest 聚焦三维度分析
+# 入口文件：app/analyze_project.py
 
 import argparse
 import os
@@ -6,8 +7,7 @@ import sys
 import time
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-HARNESS_ROOT = os.path.dirname(SCRIPT_DIR)
-PROJECT_ROOT = os.path.dirname(HARNESS_ROOT)
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)

@@ -5,6 +5,7 @@
 ```
     AI_Project_Notebook/
     ├── app/
+    │   ├── analyze_project.py  # 智能项目分析引擎入口
     │   └── analyzer/  # Python 源码
     │       ├── prompts/  # 官方 prompt 模板
     │       │   ├── __init__.py
@@ -27,7 +28,8 @@
     │   ├── scripts/  # CLI 脚本
     │   ├── skills/  # 技能目录
     │   ├── workflow/  # 工作流定义
-    │   ├── config/  # 自我升级配置
+    │   ├── config/  # 自我升级配置 + 项目模板变量
+    │   │   ├── project.yaml
     │   │   └── self-upgrade.yaml
     │   ├── prompts/  # LLM prompt 模板
     │   │   └── diagnosis.txt

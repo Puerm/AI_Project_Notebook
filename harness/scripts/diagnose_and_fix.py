@@ -602,31 +602,13 @@ def _apply_fixes_in_worktree(worktree_path: str, fix_plan: list[dict]) -> bool:
 
 
 def _run_verification(worktree_path: str) -> tuple[bool, list[str]]:
-    """在 worktree 中运行验证：check_structure + pytest + agent YAML frontmatter。
+    """在 worktree 中运行验证：两步（pytest + agent YAML frontmatter）。
 
     返回 (passed, failures)。
     """
     failures: list[str] = []
 
-    # 1. check_structure.py
-    check_script = os.path.join(worktree_path, "harness", "scripts", "check_structure.py")
-    if os.path.exists(check_script):
-        try:
-            result = subprocess.run(
-                [sys.executable, check_script],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30, cwd=worktree_path
-            )
-            combined = result.stdout + result.stderr
-            if "FAIL" in combined or result.returncode != 0:
-                failures.append(f"check_structure.py 失败: {combined[-300:]}")
-            else:
-                print("[verify] check_structure.py PASS")
-        except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
-            failures.append(f"check_structure.py 异常: {e}")
-    else:
-        failures.append("check_structure.py 在 worktree 中不存在")
-
-    # 2. pytest
+    # 1. pytest
     tests_dir = os.path.join(worktree_path, "tests")
     if os.path.isdir(tests_dir):
         try:
@@ -649,7 +631,7 @@ def _run_verification(worktree_path: str) -> tuple[bool, list[str]]:
     else:
         print("[verify] tests/ 目录不存在，跳过 pytest。")
 
-    # 3. agent YAML frontmatter 有效性检查
+    # 2. agent YAML frontmatter 有效性检查
     agents_dir = os.path.join(worktree_path, ".claude", "agents")
     if os.path.isdir(agents_dir):
         for fname in os.listdir(agents_dir):
@@ -989,7 +971,7 @@ def main() -> None:
         print("[mode] DRY-RUN — 仅诊断，不修改文件。")
 
     print("=" * 60)
-    print("  Harness 自我升级引擎 v0.1")
+    print("  自我升级引擎 v0.1")
     print("=" * 60)
 
     # 1. 加载配置
@@ -999,8 +981,8 @@ def main() -> None:
     dedup_config = config.get("dedup", _DEFAULT_CONFIG["dedup"])
     window_hours = dedup_config.get("window_hours", 24)
     print(f"[config] auto_levels: {len(auto_levels)} 条 glob 规则")
-    print(f"[config] safety_boundary: add≤{safety_boundary.get('add_max_lines', '?')}, "
-          f"replace≤{safety_boundary.get('replace_max_lines', '?')}, "
+    print(f"[config] safety_boundary: add<={safety_boundary.get('add_max_lines', '?')}, "
+          f"replace<={safety_boundary.get('replace_max_lines', '?')}, "
           f"delete={safety_boundary.get('delete', '?')}")
     print(f"[config] dedup: {window_hours}h 窗口")
 

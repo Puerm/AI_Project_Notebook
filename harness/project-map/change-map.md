@@ -4,6 +4,31 @@
 
 ## 变更记录
 
+### 2026-05-26: Harness 框架通用化 v0.1 BUG-1 修复 — _fill_templates 扩展至 .claude/ 目录
+
+- **类型**: 修复
+- **范围**: 1 修改
+- **摘要**: `init_project.py` 的 `_fill_templates` 仅遍历 `harness/`，不填充 `.claude/agents/` 中的 `{{test_command}}` 占位符。在第 522 行增加 `_fill_templates(target_claude, config_for_fill)` 调用。
+- **验证**: `check_structure.py` PASS (51/51), pytest 350 passed / 15 failed (3 gap-marker 测试因占位符已被填充而失败, 需 Tester 更新; 12 个为预存的 analyze_project CLI 测试失败)
+
+### 2026-05-26: Harness 框架通用化 v0.1 — project.yaml 模板变量 + 语言无关改造 + 目录结构分离
+
+- **类型**: 重构
+- **范围**: 1 新建 + 15 修改
+- **摘要**: 移除 Python/pytest/check_structure.py 硬编码，使 harness 框架可部署到非 Python 项目
+  - **IMP-1**: 新建 `harness/config/project.yaml` — 项目模板变量定义（project_name/version/languages/test_framework/test_command/package_manager/validation_command）
+  - **IMP-2**: `harness/scripts/help.py` — 从 project.yaml 读取项目名和版本，移除 check_structure.py/analyze_project.py 命令条目
+  - **IMP-3**: `.claude/agents/*.md` — 移除 python/pytest/snake_case.py 硬编码，替换为 {{test_command}} 和通用描述
+  - **IMP-4**: `harness/rules/coding-rules.md`, `workflow-rules.md` — 规则 3/8/11 改为语言无关描述
+  - **IMP-5**: `harness/scripts/analyze_project.py` 迁移至 `app/analyze_project.py`；check_structure.py 移除 app/analyzer/ 目录和 analyze_project.py 检查；init_project.py 移除 app/analyzer/ 创建；dimension_analyzer.py 更新路径引用
+  - **IMP-6**: `diagnose_and_fix.py` — `_run_verification()` 从三步（check_structure + pytest + agent YAML）调整为两步（pytest + agent YAML）
+  - **IMP-7**: `init_project.py` — 新增 LLM 项目检测（_detect_project_features/_generate_project_yaml/_fill_templates），降级为纯静态检测
+  - **IMP-8**: `harness/prompts/diagnosis.txt` — 头部注释改为 {{project_name}} 占位符
+  - **IMP-9**: 8 个文档同步更新（overview/directory-map/module-map/command-map/data-flow/change-map/README/CLAUDE.md）
+  - **check_structure.py**: REQUIRED_DIRS 移除 app/analyzer，REQUIRED_FILES 移除 analyze_project.py，新增 project.yaml
+- **影响文件**: `harness/config/project.yaml` (新), `help.py`, `init_project.py`, `check_structure.py`, `diagnose_and_fix.py`, `diagnosis.txt`, `dimension_analyzer.py`, `app/analyze_project.py` (新位置), `coding-rules.md`, `workflow-rules.md`, 7 个 project-map + README + CLAUDE
+- **验证**: `python harness/scripts/check_structure.py` 通过 (14/38)
+
 ### 2026-05-25: Harness 自我升级引擎 v0.1 — LLM 根因诊断 + git worktree 沙盒验证 + 自动程度分层处理
 
 - **类型**: 新功能

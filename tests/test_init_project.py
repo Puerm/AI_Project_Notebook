@@ -1,4 +1,4 @@
-# test_init_project.py — 测试项目初始化脚本
+# test_init_project.py — 测试项目初始化脚本 (TST-2: 验证 IMP-5c + IMP-7)
 
 import os
 import sys
@@ -211,6 +211,171 @@ def test_init_deployed_project_passes_check_structure():
         assert result.returncode == 0, (
             f"check_structure.py 应返回 PASS (0)，实际返回 {result.returncode}\n"
             f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+        )
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+# ======== TST-2: IMP-7 project.yaml 部署和模板填充测试 ========
+
+def test_init_deployed_project_has_project_yaml():
+    """IMP-7: 部署后目标项目包含 harness/config/project.yaml。"""
+    tmpdir = tempfile.mkdtemp()
+    try:
+        result = subprocess.run(
+            [sys.executable, SCRIPT, tmpdir], capture_output=True, encoding="utf-8"
+        )
+        assert result.returncode == 0, f"init_project 失败: {result.stderr}"
+
+        yaml_path = os.path.join(tmpdir, "harness", "config", "project.yaml")
+        assert os.path.isfile(yaml_path), (
+            f"project.yaml 缺失: {yaml_path}"
+        )
+        # 验证文件有内容
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "project_name:" in content
+        assert "version:" in content
+        assert "languages:" in content
+        assert "test_command:" in content
+        assert "package_manager:" in content
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_init_deployed_harness_rules_templates_filled():
+    """IMP-7: 部署后 harness/rules/coding-rules.md 中的 {{test_command}} 已被替换。
+    _fill_templates 的范围是 harness/ 目录。"""
+    tmpdir = tempfile.mkdtemp()
+    try:
+        result = subprocess.run(
+            [sys.executable, SCRIPT, tmpdir], capture_output=True, encoding="utf-8"
+        )
+        assert result.returncode == 0, f"init_project 失败: {result.stderr}"
+
+        # 检查 harness/rules/coding-rules.md 中不应有 {{test_command}}
+        cr_path = os.path.join(tmpdir, "harness", "rules", "coding-rules.md")
+        assert os.path.isfile(cr_path), f"coding-rules.md 缺失: {cr_path}"
+        with open(cr_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "{{test_command}}" not in content, (
+            "harness/rules/coding-rules.md 中的 {{test_command}} 应已被替换为实际测试命令"
+        )
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_init_deployed_claude_agents_filled():
+    """修复验证: _fill_templates 现在遍历 harness/ 和 .claude/ 两个目录。
+    部署后 .claude/agents/tester.md 中的 {{test_command}} 应已被替换。"""
+    tmpdir = tempfile.mkdtemp()
+    try:
+        result = subprocess.run(
+            [sys.executable, SCRIPT, tmpdir], capture_output=True, encoding="utf-8"
+        )
+        assert result.returncode == 0, f"init_project 失败: {result.stderr}"
+
+        tester_path = os.path.join(tmpdir, ".claude", "agents", "tester.md")
+        with open(tester_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "{{test_command}}" not in content, (
+            ".claude/agents/tester.md 中的 {{test_command}} 应已被替换为实际测试命令。"
+            f"当前内容包含占位符未填充。"
+        )
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_init_deployed_generator_filled():
+    """修复验证: .claude/agents/generator.md 中的 {{test_command}} 应已被填充。"""
+    tmpdir = tempfile.mkdtemp()
+    try:
+        result = subprocess.run(
+            [sys.executable, SCRIPT, tmpdir], capture_output=True, encoding="utf-8"
+        )
+        assert result.returncode == 0, f"init_project 失败: {result.stderr}"
+
+        generator_path = os.path.join(tmpdir, ".claude", "agents", "generator.md")
+        with open(generator_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "{{test_command}}" not in content, (
+            ".claude/agents/generator.md 中的 {{test_command}} 应已被替换为实际测试命令。"
+        )
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_init_deployed_tester_filled():
+    """修复验证: .claude/agents/tester.md 中的 {{test_command}} 应已被填充。"""
+    tmpdir = tempfile.mkdtemp()
+    try:
+        result = subprocess.run(
+            [sys.executable, SCRIPT, tmpdir], capture_output=True, encoding="utf-8"
+        )
+        assert result.returncode == 0, f"init_project 失败: {result.stderr}"
+
+        tester_path = os.path.join(tmpdir, ".claude", "agents", "tester.md")
+        with open(tester_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "{{test_command}}" not in content, (
+            ".claude/agents/tester.md 中的 {{test_command}} 应已被替换为实际测试命令。"
+        )
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_init_deployed_no_app_analyzer_dir():
+    """IMP-5c: 部署后目标项目不创建 app/analyzer/ 目录。"""
+    tmpdir = tempfile.mkdtemp()
+    try:
+        result = subprocess.run(
+            [sys.executable, SCRIPT, tmpdir], capture_output=True, encoding="utf-8"
+        )
+        assert result.returncode == 0, f"init_project 失败: {result.stderr}"
+
+        # init_project.py 不应在目标项目中创建 app/analyzer/
+        # app/analyzer/ 是 Notebook 自身的应用代码目录
+        app_dir = os.path.join(tmpdir, "app")
+        assert not os.path.exists(app_dir), (
+            f"init_project.py 不应创建 app/ 目录，目标项目中发现: {app_dir}"
+        )
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_init_command_map_no_check_structure():
+    """IMP-5c: 部署后的 command-map.md 不含 check_structure.py 条目。"""
+    tmpdir = tempfile.mkdtemp()
+    try:
+        result = subprocess.run(
+            [sys.executable, SCRIPT, tmpdir], capture_output=True, encoding="utf-8"
+        )
+        assert result.returncode == 0, f"init_project 失败: {result.stderr}"
+
+        cm_path = os.path.join(tmpdir, "harness", "project-map", "command-map.md")
+        with open(cm_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "check_structure.py" not in content, (
+            "deployed command-map.md should not reference check_structure.py"
+        )
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_init_command_map_no_analyze_project():
+    """IMP-5c: 部署后的 command-map.md 不含 analyze_project.py 条目。"""
+    tmpdir = tempfile.mkdtemp()
+    try:
+        result = subprocess.run(
+            [sys.executable, SCRIPT, tmpdir], capture_output=True, encoding="utf-8"
+        )
+        assert result.returncode == 0, f"init_project 失败: {result.stderr}"
+
+        cm_path = os.path.join(tmpdir, "harness", "project-map", "command-map.md")
+        with open(cm_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "analyze_project.py" not in content, (
+            "deployed command-map.md should not reference analyze_project.py"
         )
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)

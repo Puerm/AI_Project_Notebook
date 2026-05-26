@@ -629,3 +629,88 @@
 ```
 
 **降级原因**: fix_plan 为空
+
+---
+
+## 建议 1: `.claude/agents/generator.md` -- 重复模式 (3 次)
+
+> 生成时间: 2026-05-26T02:37:02.242260+00:00
+> 状态: 待确认
+
+**变更理由**: 规则 `.claude/agents/generator.md` 在工作流执行期间触发了 3 次反馈信号，严重程度均为 non_blocking。重复频率表明该规则可能需要调整或补充说明。
+
+**支持证据**: 检测到 3 次 `signal_type=rule_violation` 或 `loop_deviation` 信号关联此规则。
+
+**建议修改**: 请人工审查规则文件 `harness/rules/.claude/agents/generator.md`，考虑是否需要放宽约束条件、补充例外情况、或增加示例说明。
+
+## 建议 2: `.claude/agents/pm.md` -- 重复模式 (3 次)
+
+> 生成时间: 2026-05-26T02:37:02.242260+00:00
+> 状态: 待确认
+
+**变更理由**: 规则 `.claude/agents/pm.md` 在工作流执行期间触发了 3 次反馈信号，严重程度均为 non_blocking。重复频率表明该规则可能需要调整或补充说明。
+
+**支持证据**: 检测到 3 次 `signal_type=rule_violation` 或 `loop_deviation` 信号关联此规则。
+
+**建议修改**: 请人工审查规则文件 `harness/rules/.claude/agents/pm.md`，考虑是否需要放宽约束条件、补充例外情况、或增加示例说明。
+
+## 建议 3: `.claude/agents/planner.md` -- 重复模式 (3 次)
+
+> 生成时间: 2026-05-26T02:37:02.242260+00:00
+> 状态: 待确认
+
+**变更理由**: 规则 `.claude/agents/planner.md` 在工作流执行期间触发了 3 次反馈信号，严重程度均为 non_blocking。重复频率表明该规则可能需要调整或补充说明。
+
+**支持证据**: 检测到 3 次 `signal_type=rule_violation` 或 `loop_deviation` 信号关联此规则。
+
+**建议修改**: 请人工审查规则文件 `harness/rules/.claude/agents/planner.md`，考虑是否需要放宽约束条件、补充例外情况、或增加示例说明。
+
+## 建议 4: `harness/rules/workflow-rules.md` -- 重复模式 (6 次)
+
+> 生成时间: 2026-05-26T02:37:02.242260+00:00
+> 状态: 待确认
+
+**变更理由**: 规则 `harness/rules/workflow-rules.md` 在工作流执行期间触发了 6 次反馈信号，严重程度均为 non_blocking。重复频率表明该规则可能需要调整或补充说明。
+
+**支持证据**: 检测到 6 次 `signal_type=rule_violation` 或 `loop_deviation` 信号关联此规则。
+
+**建议修改**: 请人工审查规则文件 `harness/rules/harness/rules/workflow-rules.md`，考虑是否需要放宽约束条件、补充例外情况、或增加示例说明。
+
+## 建议 5: `harness/rules/coding-rules.md` -- 重复模式 (3 次)
+
+> 生成时间: 2026-05-26T02:37:02.242260+00:00
+> 状态: 待确认
+
+**变更理由**: 规则 `harness/rules/coding-rules.md` 在工作流执行期间触发了 3 次反馈信号，严重程度均为 non_blocking。重复频率表明该规则可能需要调整或补充说明。
+
+**支持证据**: 检测到 3 次 `signal_type=rule_violation` 或 `loop_deviation` 信号关联此规则。
+
+**建议修改**: 请人工审查规则文件 `harness/rules/harness/rules/coding-rules.md`，考虑是否需要放宽约束条件、补充例外情况、或增加示例说明。
+
+---
+
+## 自我升级诊断 [降级] — `.claude/agents/pm.md`
+
+> 生成时间: 2026-05-26T02:37:10.901186+00:00
+> 状态: 待确认（降级 — semi-auto: 用户拒绝或超时 (300s)）
+
+**诊断结果**:
+```json
+{
+  "root_cause": "pm.md 职责边界定义不够清晰，缺少最终收敛到 spec 文件的明确检查机制，导致讨论可能无限反复",
+  "category": "boundary_unclear",
+  "affected_files": [
+    ".claude/agents/pm.md"
+  ],
+  "fix_plan": [
+    {
+      "file": ".claude/agents/pm.md",
+      "type": "insert",
+      "content": "\n## 自我升级规则\n\n### 检查：是否已完成\nPM Agent 每次迭代后需自我检查以下条件，满足任意两个即视为“讨论完成”，进入输出 Spec 阶段：\n1. 至少 3 个核心功能已明确 MVP 和验收标准。\n2. 用户明确说了“可以”、“确认”、“通过”等关键词。\n3. 已识别出至少 1 个风险或未决问题并在 Spec 中记录。\n4. 当前对话轮次超过 15 轮仍无进展，此时必须收敛。\n\n### 检查：是否超过最大轮次\nPM Agent 最多与用户讨论 20 轮。若超过 20 轮仍无法收敛，在 Spec 中直接输出当前已确认的内容，所有未确认项标记为“未决问题”，并终止讨论。",
+      "reason": "明确了何时必须收敛讨论并输出 Spec，防止 PM Agent 与用户无限讨论不输出结果，消除反复进入 PM 阶段而无法推进到下一阶段的根源"
+    }
+  ]
+}
+```
+
+**降级原因**: semi-auto: 用户拒绝或超时 (300s)

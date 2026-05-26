@@ -21,7 +21,6 @@ REQUIRED_DIRS = [
     ".claude/agents",
     ".claude/commands",
     ".claude/skills",
-    "app/analyzer",
 ]
 
 REQUIRED_FILES = [
@@ -31,7 +30,6 @@ REQUIRED_FILES = [
     "harness/scripts/check_structure.py",
     "harness/scripts/help.py",
     "harness/scripts/search_notes.py",
-    "harness/scripts/analyze_project.py",
     "harness/scripts/diagnose_and_fix.py",
     "harness/scripts/export_report.py",
     "harness/skills/README.md",
@@ -47,6 +45,7 @@ REQUIRED_FILES = [
     "harness/project-map/data-flow.md",
     "harness/project-map/change-map.md",
     "harness/config/self-upgrade.yaml",
+    "harness/config/project.yaml",
     "harness/prompts/diagnosis.txt",
     "harness/feedback/error-log.md",
     "harness/feedback/improvement-log.md",

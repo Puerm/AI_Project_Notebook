@@ -8,12 +8,11 @@
 | ---- | ---- | ---- |
 | `python harness/scripts/help.py` | 打印所有可用命令 | `harness/scripts/help.py` |
 | `python harness/scripts/init_project.py <目标路径>` | 初始化新项目地图 | `harness/scripts/init_project.py` |
-| `python harness/scripts/check_structure.py` | 检查项目结构完整性 | `harness/scripts/check_structure.py` |
 | `python harness/scripts/search_notes.py <关键词>` | 搜索笔记 | `harness/scripts/search_notes.py` |
 | `python harness/scripts/export_report.py` | 导出项目理解报告 | `harness/scripts/export_report.py` |
-| `python harness/scripts/analyze_project.py <目标路径>` | 智能项目分析引擎 (v0.5.1: 渐进式披露 / --digest 聚焦三维度分析) [--digest] [--max-size N] | `harness/scripts/analyze_project.py` |
 | `python harness/scripts/generate_rule_evolution.py` | 扫描反馈信号，生成规则演化建议 | `harness/scripts/generate_rule_evolution.py` |
 | `python harness/scripts/diagnose_and_fix.py` | 自我升级引擎 — 扫描反馈信号的重复模式，自动诊断并应用修复（沙盒验证） | `harness/scripts/diagnose_and_fix.py` |
+| `python app/analyze_project.py <目标路径>` | 智能项目分析引擎 (v0.5.1: 渐进式披露 / --digest 聚焦三维度分析) [--digest] [--max-size N] | `app/analyze_project.py` |
 
 ## Claude Code 命令
 

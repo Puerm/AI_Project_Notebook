@@ -2,13 +2,13 @@
 
 ## 项目定位
 
-AI Project Notebook — 项目理解与知识沉淀工作台。v0.1 命令行版本。
+AI Project Notebook — 项目理解与知识沉淀工作台。v0.9 命令行版本。
 
 ## 工作原则
 
 - 所有变更必须先读 `harness/project-map/overview.md` 了解项目全貌
 - 修改文件后检查 `harness/rules/` 下的相关规则是否命中
-- 代码修改后运行 `python harness/scripts/check_structure.py` 确认结构完整
+- 代码修改后运行项目配置的结构验证命令
 - 遇到错误记录到 `harness/feedback/error-log.md`
 - 发现可改进的规则记录到 `harness/feedback/improvement-log.md`
 - 每次任务完成后更新 `harness/project-map/change-map.md`
