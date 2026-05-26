@@ -61,6 +61,7 @@ tools: Read, Glob, Grep, Bash, Write, Edit
 2. 发现不一致 → 更新地图文件
 3. 项目结构发生重大变化时（新增顶层目录、新增子系统），主动更新 `overview.md`
 
+<!-- ADAPTABLE_ZONE_START -->
 ## 输出格式
 
 ```
@@ -90,3 +91,4 @@ tools: Read, Glob, Grep, Bash, Write, Edit
 - 修改规则后必须运行项目配置的结构验证命令
 - 不删除规则，只增加或修改 — 删除规则需要用户明确批准
 - 不同规则文件之间有交叉引用时，修改一处后检查是否要同步修改他处
+<!-- ADAPTABLE_ZONE_END -->

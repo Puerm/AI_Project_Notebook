@@ -69,14 +69,17 @@ def _build_risk_prompt_from_files(filtered_files, arch_text, stories_text, proje
 
 def _call_llm_with_retry(system_prompt, user_prompt, config, max_tokens=4096, timeout=120):
     """调用 LLM，失败时自动重试（最多 3 次，指数退避）。"""
+    last_error = None
     for attempt in range(1, RETRY_MAX + 1):
+        # 非最后一次重试时静默，最后一次暴露真实错误
+        is_last = attempt == RETRY_MAX
         result = _call_llm(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             config=config,
             max_tokens=max_tokens,
             timeout=timeout,
-            silent=True,
+            silent=not is_last,
         )
         if result is not None:
             if attempt > 1:

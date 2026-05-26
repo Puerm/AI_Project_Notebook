@@ -31,6 +31,7 @@ REQUIRED_FILES = [
     "harness/scripts/help.py",
     "harness/scripts/search_notes.py",
     "harness/scripts/diagnose_and_fix.py",
+    "harness/scripts/harness_deploy.py",
     "harness/scripts/export_report.py",
     "harness/skills/README.md",
     "harness/workflow/README.md",

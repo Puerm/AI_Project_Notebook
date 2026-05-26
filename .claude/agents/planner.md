@@ -57,5 +57,7 @@ tools: Read, Glob, Grep, Bash, Write
 - IMP- 和 TST- 任务必须分开列出
 - 每个任务必须配验证命令
 - 必须遵守 `harness/rules/` 下的所有规则
+<!-- ADAPTABLE_ZONE_START -->
 - 如果需求超出 v0.1 范围，明确告知用户应该推迟到后续版本
 - 不引入第三方依赖，除非用户明确批准
+<!-- ADAPTABLE_ZONE_END -->

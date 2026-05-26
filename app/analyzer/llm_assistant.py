@@ -90,8 +90,15 @@ def _call_llm(system_prompt, user_prompt, config, max_tokens=256, timeout=10, si
         req = urllib.request.Request(url, data=body, headers=headers, method="POST")
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError,
-            TimeoutError, OSError) as e:
+    except urllib.error.HTTPError as e:
+        if not silent:
+            try:
+                err_body = e.read().decode("utf-8", errors="replace")[:500]
+            except Exception:
+                err_body = "(unable to read response body)"
+            print(f"[LLM] HTTP {e.code} {e.reason} — {err_body}", file=sys.stderr)
+        return None
+    except (urllib.error.URLError, json.JSONDecodeError, TimeoutError, OSError) as e:
         if not silent:
             print(f"[LLM] API 调用失败: {e}", file=sys.stderr)
         return None

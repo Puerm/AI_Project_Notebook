@@ -6,7 +6,7 @@
 
 ## 版本
 
-**v0.9** — Harness 框架通用化。移除 Python/pytest 硬编码，引入 `project.yaml` 模板变量系统，目录结构分离（analyze_project.py 迁移至 app/），`init_project.py` LLM 项目检测与模板填充。Agent 定义和规则文件改为语言无关描述。
+**v1.0** — Harness 框架个性化部署。新增 `harness_deploy.py` — LLM 自动检测新项目技术栈并生成适配建议，逐项交互式确认（y/n/e），确认后原子写入。Agent 定义文件引入可适配区标记（ADAPTABLE_ZONE），部署时 LLM 只修改标记内的语言特定内容。
 
 ### 版本历史
 
@@ -19,6 +19,7 @@
 | v0.7 | 反馈调节系统 — FeedbackSignal + 重复模式检测 + 偏差趋势自适应回环 |
 | v0.8 | 自我升级引擎 — LLM 诊断 + worktree 沙盒 + 自动修复合并 |
 | v0.9 | Harness 框架通用化 — project.yaml 模板变量 + 语言无关 agent/规则 + 目录结构分离 |
+| v1.0 | Harness 框架个性化部署 — LLM 检测新项目 + 适配建议生成 + 交互式确认 |
 
 ## 快速开始
 
@@ -43,6 +44,9 @@ python harness/scripts/generate_rule_evolution.py
 python harness/scripts/diagnose_and_fix.py          # 交互模式
 python harness/scripts/diagnose_and_fix.py --yes    # 自动确认 semi-auto
 python harness/scripts/diagnose_and_fix.py --dry-run # 仅诊断不修改
+
+# Harness 框架个性化部署（LLM 驱动，交互式确认）
+python harness/scripts/harness_deploy.py <目标项目路径>
 ```
 
 ## 在新项目中使用
@@ -80,7 +84,8 @@ AI-Project-Notebook/
 │   ├── rules/                 # 可执行规则（coding / data-safety / workflow）
 │   ├── scripts/               # CLI 脚本
 │   │   ├── generate_rule_evolution.py
-│   │   └── diagnose_and_fix.py   # 自我升级引擎
+│   │   ├── diagnose_and_fix.py   # 自我升级引擎
+│   │   └── harness_deploy.py     # 个性化部署引擎
 │   ├── workflow/              # 工作流定义（full-cycle / implement / quick-fix / review-fix）
 │   ├── config/                # 配置
 │   │   ├── project.yaml       # 项目模板变量

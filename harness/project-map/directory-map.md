@@ -26,6 +26,14 @@
     ├── harness/
     │   ├── rules/  # 规则
     │   ├── scripts/  # CLI 脚本
+    │   │   ├── check_structure.py
+    │   │   ├── diagnose_and_fix.py
+    │   │   ├── export_report.py
+    │   │   ├── generate_rule_evolution.py
+    │   │   ├── harness_deploy.py
+    │   │   ├── help.py
+    │   │   ├── init_project.py
+    │   │   └── search_notes.py
     │   ├── skills/  # 技能目录
     │   ├── workflow/  # 工作流定义
     │   ├── config/  # 自我升级配置 + 项目模板变量

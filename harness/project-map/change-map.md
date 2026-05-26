@@ -4,6 +4,40 @@
 
 ## 变更记录
 
+### 2026-05-26: deploy 脚本集成 init 流水线 — 读取 project.yaml 基线
+
+- **类型**: 增强
+- **范围**: 1 修改
+- **摘要**: `harness_deploy.py` 的 `detect_project()` 现在优先读取 `init_project.py` 生成的 `project.yaml` 作为基线，只补充缺失字段（domain/description/entry_point），不覆盖已有值。确立三步迁移流程：init → analyze → deploy。
+  - 新增 `_read_project_yaml_baseline()` 读取已有 project.yaml
+  - `_llm_detect_project()` 支持 `focus_fields` 参数，基线存在时只请求缺失字段
+  - `main()` 帮助文本更新为三步迁移流程图
+- **验证**: `check_structure.py` 52/52 PASS
+
+### 2026-05-26: Harness 框架个性化部署 v0.1 审查修复 — 3 个 Reviewer 问题修复
+
+- **类型**: 修复
+- **范围**: 1 修改
+- **摘要**: 修复 `harness_deploy.py` `_adapt_workflow_content` 中 Reviewer 发现的 3 个问题
+  - `{{project_name}}` 替换值从 `os.path.basename(os.getcwd())` 改为 `features.get("project_name")`
+  - `is_frontend_only`/`is_go_only`/`is_rust_only` 死代码消除：现在实际影响 stages 跳过逻辑
+  - 实现 YAML frontmatter 解析 + 项目类型条件适配：前端项目自动标记 `tester`/`generator-fix`/`generator-test-fix` 阶段为 `skip: true`
+- **验证**: `check_structure.py` 52/52 PASS, 功能测试通过
+
+### 2026-05-26: Harness 框架个性化部署 v0.1 — LLM 检测 + 适配建议生成 + 交互式确认
+
+- **类型**: 新功能
+- **范围**: 1 新建 + 18 修改
+- **摘要**: 实现 Harness 框架个性化部署系统，使 harness 可智能适配目标项目
+  - **IMP-1**: 7 个 agent 文件 (pm/planner/explorer/generator/reviewer/tester/harness_maintainer) 添加 `<!-- ADAPTABLE_ZONE_START/END -->` 可适配区标记
+  - **IMP-2**: `harness/config/project.yaml` 新增 `domain`、`description`、`entry_point` 三个字段
+  - **IMP-3**: 新建 `harness/scripts/harness_deploy.py` — 三阶段部署引擎 (Phase 1: LLM 项目检测 + 静态降级, Phase 2: 适配建议生成, Phase 3: 交互式确认 + 原子写入)
+  - **IMP-4**: `help.py` / `check_structure.py` / `command-map.md` 注册新命令
+  - **IMP-5**: 5 个 project-map 文档同步更新 (module-map/directory-map/data-flow/change-map/overview)
+  - **IMP-6**: `README.md` / `CLAUDE.md` 版本号 v0.9 -> v0.10，新增 harness_deploy 使用说明
+- **影响文件**: `harness_deploy.py` (新), 7 个 agent 文件, `project.yaml`, `help.py`, `check_structure.py`, 5 个 project-map, `README.md`, `CLAUDE.md`
+- **验证**: `python harness/scripts/check_structure.py` 52/52 通过
+
 ### 2026-05-26: Harness 框架通用化 v0.1 BUG-1 修复 — _fill_templates 扩展至 .claude/ 目录
 
 - **类型**: 修复

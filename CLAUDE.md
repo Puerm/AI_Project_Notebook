@@ -2,7 +2,7 @@
 
 ## 项目定位
 
-AI Project Notebook — 项目理解与知识沉淀工作台。v0.9 命令行版本。
+AI Project Notebook — 项目理解与知识沉淀工作台。v1.0 命令行版本。
 
 ## 工作原则
 

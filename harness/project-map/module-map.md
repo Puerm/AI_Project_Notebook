@@ -24,6 +24,7 @@
 | harness\state\workflow_state.py | 工作流状态管理器（偏差趋势/回环决策） | init, record_stage, get_deviation_trend, should_continue_loop, to_feedback_signal | WorkflowState |
 | harness\scripts\generate_rule_evolution.py | 规则演化建议生成脚本 | - | - |
 | harness\scripts\diagnose_and_fix.py | 自我升级引擎 — 反馈信号驱动的自动诊断与修复 | main, _load_config, _check_dedup, _apply_safety_boundary, _call_llm_diagnosis, _sandbox_verify, _write_upgrade_history | - |
+| harness\scripts\harness_deploy.py | Harness 框架个性化部署 — LLM 检测 + 适配建议生成 + 交互式确认 | main | - |
 | harness\config\project.yaml | 项目模板变量定义 — 所有占位符 {{...}} 的单一数据源 | - | - |
 | tests\test_export_report.py | 导出报告测试 | test_export_report_runs_and_returns_zero, test_export_report_contains_expected_sections, test_export_report_sections_have_numbered_source_labels | - |
 | tests\test_help.py | help 命令测试 | test_help_runs_and_returns_zero, test_help_lists_all_commands | - |

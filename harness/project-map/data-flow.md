@@ -57,6 +57,40 @@ target_path/
 
 ---
 
+## harness-deploy 数据流 (v1.0)
+
+```
+目标项目目录/
+    │
+    ├── [Phase 1] 项目检测
+    │   ├── 目录结构扫描（scan_tree, max_depth=3）
+    │   ├── 引导文件收集（README.md, package.json, go.mod, Cargo.toml ...）
+    │   ├── LLM 增强检测（_llm_detect_project → JSON: languages/framework/domain/description/entry_point）
+    │   │   └── 降级: _detect_project_features() → 静态检测（后缀统计 + 配置文件检测）
+    │   └── 输出: 检测摘要 features dict → 用户确认
+    │
+    ├── [Phase 2] 适配建议生成
+    │   ├── Agent 文件（.claude/agents/*.md）:
+    │   │   ├── 解析 ADAPTABLE_ZONE_START/END 标记
+    │   │   └── LLM 适配可适配区内容 → 替换命令引用/文件命名约定/语言特定约束
+    │   ├── Workflow 文件（harness/workflow/*.md）:
+    │   │   └── 模板变量替换 + 项目类型适配（纯前端跳过 tester 阶段等）
+    │   ├── Rule 文件（harness/rules/*.md）:
+    │   │   ├── {{test_command}} 等占位符替换
+    │   │   └── LLM 重写语言特定规则（如 TypeScript → ESLint/tsconfig, Go → gofmt）
+    │   ├── project.yaml: 填入 Phase 1 检测到的值
+    │   └── CLAUDE.md: 生成项目定位描述 + 项目地图入口表
+    │
+    └── [Phase 3] 交互式确认
+        ├── 检测摘要确认（第一个确认项，缓解 LLM 检测偏差）
+        ├── 逐文件 diff 展示（project.yaml → CLAUDE.md → agents → workflows → rules）
+        ├── 用户交互: y(确认) / n(跳过) / e(编辑器手动修改)
+        ├── 原子写入: .tmp + os.replace（data-safety-rule 8）
+        └── 一致性检查: 扫描残留 {{...}} 占位符 + ADAPTABLE_ZONE 标记
+```
+
+---
+
 ## Digest 分析流水线 (v0.5.1 聚焦分析)
 
 ```

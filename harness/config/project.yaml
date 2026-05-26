@@ -2,10 +2,13 @@
 # 部署到目标项目时由 init_project.py 根据 LLM 检测结果生成新值
 
 project_name: AI Project Notebook
-version: "0.9"
+version: "1.0"
 languages:
   - python
 test_framework: pytest
 test_command: python -m pytest tests/ -v
 package_manager: pip
 validation_command: python harness/scripts/check_structure.py
+domain: "AI 辅助开发工具"
+description: "面向 AI 辅助开发的项目理解与 Harness 反馈工作台"
+entry_point: "app/analyze_project.py"

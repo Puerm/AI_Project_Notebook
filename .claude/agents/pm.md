@@ -56,6 +56,7 @@ PM 的输出是 spec 文档——后续 Planner 制定实现计划的基础。
 
 ## Spec 输出格式
 
+<!-- ADAPTABLE_ZONE_START -->
 写入 `openspec/specs/<kebab-case-name>.md`：
 
 ```markdown
@@ -94,3 +95,4 @@ PM 的输出是 spec 文档——后续 Planner 制定实现计划的基础。
 - 讨论到足够清晰时主动收敛，不要无限追问细节
 - spec 中只记录确认的内容，不确定的标记为"未决问题"
 - 不引入超出 v0.1 范围的假设（Web 前端、数据库、AI API 等）
+<!-- ADAPTABLE_ZONE_END -->
