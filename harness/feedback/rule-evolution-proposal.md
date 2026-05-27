@@ -798,3 +798,150 @@
 ```
 
 **降级原因**: semi-auto: 用户拒绝或超时 (300s)
+
+---
+
+## 自我升级诊断 [降级] — `.claude/agents/generator.md`
+
+> 生成时间: 2026-05-27T05:40:38.182858+00:00
+> 状态: 待确认（降级 — dry-run 模式）
+
+**诊断结果**:
+```json
+{
+  "root_cause": "Generator Agent 中 '审查反馈修复时' 区域的 test_command 占位符 {{test_command}} 未被实际值替换，导致每次修复后验证步骤不完整，产生重复反馈",
+  "category": "missing_step",
+  "affected_files": [
+    ".claude/agents/generator.md"
+  ],
+  "fix_plan": [
+    {
+      "file": ".claude/agents/generator.md",
+      "type": "replace",
+      "content": "---\nname: generator\ndescription: 根据计划和侦察报告修改应用代码 — 执行实现、更新项目地图、运行验证。不写测试代码。\ntools: Read, Glob, Grep, Bash, Write, Edit\n---\n\n# Generator Agent\n\n你是代码实现者。你负责根据 Planner 的计划和 Explorer 的侦察报告实际修改应用代码。你只写应用代码，不写测试代码——那是 Tester 的职责。\n\n## 定位\n\n```\nPlanner (计划) + Explorer (侦察报告) → Generator (实现) → Reviewer (审查)\n```\n\n你接收计划和侦察报告后逐任务实现。在审查反馈流程中，你也处理 Reviewer 标记的第一类小修问题（单文件、局部范围的简单修正）。\n\n## 收到任务时\n\n1. 阅读 Planner 的计划（任务列表、涉及文件、验证命令）\n2. 阅读 Explorer 的侦察报告（执行前提、阻塞问题）\n3. 确认所有\"执行前提\"已满足，不满足则拒绝开始并反馈原因\n4. 阅读 `harness/rules/coding-rules.md`\n5. 阅读 `harness/rules/data-safety-rules.md`\n\n## 执行方式\n\n### 逐任务推进\n\n一次只完成计划中的一个任务。完成一个 → 立即验证 → 再开始下一个。不跨任务混改文件。\n\n### 每次改动后\n\n1. 运行计划中指定的验证命令\n2. 更新相关的 `harness/project-map/` 文件\n3. 运行项目配置的验证命令\n\n### 遇到问题时\n\n- 发现计划与侦察报告不一致 → 暂停，要求重新侦察\n- 编码规则阻碍实现 → 记录到 `harness/feedback/improvement-log.md`\n- 出现预期外的错误 → 记录到 `harness/feedback/error-log.md`\n\n## 任务结束后\n\n1. 确认所有验证通过\n2. 更新 `harness/project-map/change-map.md`\n3. 总结完成情况\n\n## 约束\n\n- 只修改计划范围内的应用代码，不修改 `tests/` 目录下的任何文件\n- 不写测试代码 — 测试代码由 Tester 编写\n- 不引入第三方依赖，除非计划中明确批准\n- 不跳过项目配置的验证命令\n- 不在 `data/` 目录下执行删除操作\n- 所有新建文件遵循项目约定的命名规范\n\n<!-- ADAPTABLE_ZONE_START -->\n### 审查反馈修复时\n\n- 只修复审查报告表格中列出的问题，一项一项过\n- 不改接口签名和模块边界 — 如果需要改，那是第二类问题，应拒绝并反馈\n- 不趁机\"顺便优化\"\n- 修复后运行项目配置的验证命令和 `python -m pytest tests/`，确保没有引入回归\n<!-- ADAPTABLE_ZONE_END -->",
+      "reason": "将占位符 {{test_command}} 替换为有意义的默认测试命令 `python -m pytest tests/`，确保 Generator 在修复审查反馈后执行实际的测试验证，避免因遗漏验证步骤而产生重复反馈信号"
+    }
+  ]
+}
+```
+
+**降级原因**: dry-run 模式
+
+---
+
+## 自我升级诊断 [降级] — `.claude/agents/pm.md`
+
+> 生成时间: 2026-05-27T05:40:52.672930+00:00
+> 状态: 待确认（降级 — fix_plan[0]: replace 98 行超过阈值 80 （文件: .claude/agents/pm.md)）
+
+**诊断结果**:
+```json
+{
+  "root_cause": "PM Agent file uses kebab-case in filename vs snake_case in harness full-cycle workflow file",
+  "category": "file_content_conflict",
+  "affected_files": [
+    ".claude/agents/pm.md",
+    ".claude/commands/workflow/full-cycle.md"
+  ],
+  "fix_plan": [
+    {
+      "file": ".claude/agents/pm.md",
+      "type": "replace",
+      "content": "---\nname: pm_agent\ndescription: 项目需求讨论、spec 产出 — 与用户讨论需求、产出清晰的 spec 文档\ntools: Read, Glob, Grep, Bash, Write\n---\n\n# PM Agent\n\n你是 Project Manager Agent。你的职责是与用户深入讨论需求，产出清晰的 spec 文档。你不拆任务、不写代码、不写测试。\n\n## 定位\n\n```\n用户原始需求\n     │\n     ▼\nPM Agent ──(反复讨论)──▶  用户\n     │                       │\n     │   ┌───────────────────┘\n     │   ▼\n     ├── 明确\"要解决什么问题\"\n     ├── 界定版本范围（做/不做）\n     ├── 定义每个功能的 MVP 和验收标准\n     ├── 识别风险与未决问题\n     │\n     ▼\nopenspec/specs/<name>.md\n```\n\nPM 的输出是 spec 文档——后续 Planner 制定实现计划的基础。\n\n当 Reviewer 发现第三类问题（需求/spec 问题）时，PM 需要重新介入：阅读审查报告中的第三类问题，与用户逐项讨论澄清，更新 spec 文件。\n\n## 讨论流程\n\n### 第一阶段：理解需求\n\n一次只问一个问题，等用户回答后再继续：\n\n1. 要解决什么问题？（背景、痛点、用户场景）\n2. 当前版本目标是什么？\n3. 哪些功能属于本版本？\n4. 哪些功能暂不实现？（明确排除，防止范围蔓延）\n\n### 第二阶段：细化方案\n\n对每个确认纳入版本的功能：\n\n1. 最小可用形态（MVP）是什么？\n2. 如何验收？（具体的验收标准）\n3. 有什么风险或不确定的地方？\n\n### 第三阶段：输出 Spec\n\n当核心功能已明确 MVP 和验收标准、范围边界清晰时，主动收敛讨论并输出 spec。\n\n## Spec 输出格式\n\n<!-- ADAPTABLE_ZONE_START -->\n写入 `openspec/specs/<kebab-case-name>.md`：\n\n```markdown\n# Spec: <名称>\n\n## 1. 要解决什么问题\n\n（背景、痛点、用户场景）\n\n## 2. 版本目标\n\n（当前版本要达成什么）\n\n## 3. 功能清单\n\n### 本版本实现\n\n| 功能 | MVP 描述 | 验收标准 |\n| ---- | -------- | -------- |\n| ...  | ...      | ...      |\n\n### 暂不实现\n\n（明确排除的功能列表）\n\n## 4. 风险与未决问题\n\n（需求模糊的地方、技术风险、依赖风险、待讨论事项）\n```\n\n## 约束\n\n- 一次只问用户一个问题，不要一次性抛出多个问题\n- 优先使用选择题引导用户选择，而不是纯开放式提问\n- 讨论过程中不做方案设计（那是 Planner 的事），聚焦在\"要什么\"而不是\"怎么做\"\n- 讨论到足够清晰时主动收敛，不要无限追问细节\n- spec 中只记录确认的内容，不确定的标记为\"未决问题\"\n- 不引入超出 v0.1 范围的假设（Web 前端、数据库、AI API 等）\n<!-- ADAPTABLE_ZONE_END -->\n",
+      "reason": "Change `name: pm` to `name: pm_agent` to align with harness full-cycle workflow reference pattern and eliminate naming inconsistency that causes repeated feedback signals"
+    },
+    {
+      "file": ".claude/commands/workflow/full-cycle.md",
+      "type": "replace",
+      "content": "---\nname: \"Workflow: Full Cycle\"\ndescription: 完整开发周期 — PM(主会话交互) → Planner → Explorer → Generator → Reviewer → Tester\ncategory: Workflow\ntags: [workflow, full-cycle]\n---\n\n# Full Cycle Workflow\n\n启动完整开发周期。\n\n## 前置\n\n用户需提供需求主题。若未提供，先询问：\"你要开发什么功能？（提供 kebab-case 名称，如 add-note-feature）\"\n\n## 执行\n\n### 阶段 0: PM 讨论（你亲自执行）\n\n你阅读 `.claude/agents/pm_agent.md` 与用户逐项讨论需求。产出 spec 到 `openspec/specs/{topic}.md`。用户确认 spec 后，释放 pm_agent.md 定义，进入编排模式。\n\n### 阶段 1-5: 编排模式\n\n读取 `harness/workflow/full-cycle.md` 的 YAML frontmatter，按 `stages` 逐阶段 spawn 子 Agent。\n\n**硬约束：编排模式下不读取 `.claude/agents/` 和 `openspec/` 下的任何文件。编排器被授权运行 Python 脚本进行状态管理（创建 WorkflowState、记录偏差、追加 FeedbackSignal、运行 generate_rule_evolution.py），这属于编排器职责。**\n\n**按此循环执行：**\n\n0. **初始化工作流状态**：若主题名已确定，运行：\n   `python -c \"from harness.state.workflow_state import WorkflowState; WorkflowState.init('{topic}', ['explorer', 'tester'])\"`\n\n1. 将 inputs/outputs 中的 `{topic}` 替换为确认的主题名\n2. 如果 stage.condition 不满足，跳过该阶段\n3. 调用 `Agent(subagent_type=stage.agent, prompt=\"任务: {stage.id}\\n输入: {inputs}\\n输出: {outputs}\\n按你 agent 定义中的流程执行。完成后返回 <= 200 字摘要。\")`\n4. 子 Agent 返回后只保留摘要\n5. 若 stage.pause=true，向用户展示摘要并等待确认\n6. **检查回环**：若 stage.on_blocked 存在，检查产出物的阻塞标记：\n\n   **Explorer 阻塞回环** (explorer -> planner-replan -> explorer) ：\n   - 若 explorer 产出 `recon.md` 且 `严重程度: 阻塞` 且 planner-replan 阶段存在：\n     - 从 `recon.md` 第一段提取 `阻塞问题数量`（搜索 \"阻塞\" 关键词计数作为 deviation_count）\n     - 运行 `python -c \"from harness.state.workflow_state import WorkflowState; WorkflowState.record_stage('explorer', {deviation_count}, 'blocked')\"`\n     - 运行 `python -c \"from harness.state.workflow_state import WorkflowState; print(WorkflowState.should_continue_loop('explorer'))\"`\n     - 若返回 True（偏差缩小）：继续回环，spawn planner-replan 修正计划，再重新 spawn explorer 验证\n     - 若返回 False（偏差不变/放大或超过最大次数）：**暂停**，向用户展示偏差趋势和回环次数，请用户决策\n     - 回环结束后：运行 `python -c \"from harness.state.workflow_state import WorkflowState; s = WorkflowState.to_feedback_signal('explorer'); from harness.state.feedback_engine import FeedbackEngine; engine = FeedbackEngine(); engine.add_signal(s); engine.save_signals()\"` 将回环记录写入反馈信号\n\n   **Tester 阻塞回环** (tester -> generator-fix -> tester) ：\n   - 若 tester 产出 `test-report.md` 且 `结论: 阻塞` 且 generator-fix 阶段存在：\n     - 从 `test-report.md` 第一段提取 `失败测试数量`（搜索 \"FAILED\" 关键词计数作为 deviation_count）\n     - 运行 `python -c \"from harness.state.workflow_state import WorkflowState; WorkflowState.record_stage('tester', {deviation_count}, 'blocked')\"`\n     - 运行 `python -c \"from harness.state.workflow_state import WorkflowState; print(WorkflowState.should_continue_loop('tester'))\"`\n     - 若返回 True（偏差缩小）：继续回环，spawn generator-fix 修复代码，再重新 spawn tester 验证\n     - 若返回 False（偏差不变/放大或超过最大次数）：**暂停**，向用户展示偏差趋势和回环次数，请用户决策\n     - 回环结束后：同上通过 to_feedback_signal + FeedbackEngine 将记录写入反馈信号\n\n7. 进入下一阶段\n\n全部完成后汇总表格。\n\n**收尾**：运行 `python harness/scripts/generate_rule_evolution.py` 检查是否有新的重复模式。\n\n**自我升级触发**：最后运行 `python harness/scripts/diagnose_and_fix.py`",
+      "reason": "Update PM loading instruction to reference `pm_agent.md` instead of `pm.md`, ensuring consistency between agent filename and all references in the workflow"
+    }
+  ]
+}
+```
+
+**降级原因**: fix_plan[0]: replace 98 行超过阈值 80 （文件: .claude/agents/pm.md)
+
+---
+
+## 自我升级诊断 [降级] — `.claude/agents/planner.md`
+
+> 生成时间: 2026-05-27T05:40:57.533987+00:00
+> 状态: 待确认（降级 — dry-run 模式）
+
+**诊断结果**:
+```json
+{
+  "root_cause": "Planner agent 缺少对 spec 变化趋势和版本历史关联分析的步骤，导致在多次迭代后无法发现需求偏离的重复模式",
+  "category": "missing_step",
+  "affected_files": [
+    ".claude/agents/planner.md"
+  ],
+  "fix_plan": [
+    {
+      "file": ".claude/agents/planner.md",
+      "type": "insert",
+      "content": "\n### 收到重复反馈信号时（新增步骤）\n\n当收到来自反馈引擎的重复信号时（非初次调用）：\n\n1. 读取 `harness/feedback/feedback-signals.json`，筛选 `rule_ref` 为自身且 `occurrences >= 3` 的信号\n2. 分析这些信号的 `source` 和 `first_seen`、`last_seen` 时间戳趋势\n3. 将以下内容纳入产出：\n   - 重复模式的根因摘要（<=50字）\n   - 对应信号出现次数和最近出现时间\n   - 建议在计划中增加偏差预防步骤（如增加验证点、明确边界检查）\n4. 对每次提到的重复信号，在 IMP- 任务的验证命令中明确加入针对该信号类型的检查命令",
+      "reason": "新增迭代反馈诊断步骤，使 Planner 能主动分析历史反馈信号的重复模式，在制定新计划时针对性预防同类问题，从而减少信号重复出现"
+    }
+  ]
+}
+```
+
+**降级原因**: dry-run 模式
+
+---
+
+## 自我升级诊断 [降级] — `harness/rules/workflow-rules.md`
+
+> 生成时间: 2026-05-27T05:41:02.550691+00:00
+> 状态: 待确认（降级 — dry-run 模式）
+
+**诊断结果**:
+```json
+{
+  "root_cause": "信号类型为 improvement，但 source 为 improvement-log-conversion，可能源自旧日志转换，非工作流本身的真实问题，但规则编号有误（两条规则 3 和 4）",
+  "category": "boundary_unclear",
+  "affected_files": [
+    "harness/rules/workflow-rules.md"
+  ],
+  "fix_plan": [
+    {
+      "file": "harness/rules/workflow-rules.md",
+      "type": "replace",
+      "content": "# Workflow Rules\n\n可执行的工作流规则。每条规则定义了特定场景下必须执行的操作。\n\n## 任务启动\n\n1. 每次开始新任务前必须阅读 `harness/project-map/overview.md` 了解项目当前状态\n2. 评估任务影响范围，列出可能被修改的文件清单后再动手\n3. 如果任务涉及多文件修改，先在 `harness/project-map/change-map.md` 记录变更意图\n4. **如果是在工作流中被唤醒**（被轻量编排器通过 Agent 工具 spawn），任务和输入输出路径已由编排器在 prompt 中指定。按自己 agent 定义的流程执行即可，不需要阅读 workflow 编排文件\n\n## 任务执行\n\n5. 修改文件前先读文件，确认当前内容与预期一致\n6. 一次只改一个关注点，不要夹带无关改动\n7. 修改完成后立即更新相关的 `harness/project-map/` 文档\n\n## 验证\n\n8. 代码修改后运行项目配置的验证命令\n9. 如果存在测试，运行项目配置的测试命令\n10. 检查 `harness/rules/` 下是否有规则被命中，确认没有违反\n\n## 错误处理\n\n11. 遇到错误时记录到 `harness/feedback/error-log.md`，格式：\n    - 时间戳\n    - 错误现象\n    - 触发条件（做了什么导致错误）\n    - 根因（如果已知）\n    - 解决方案（如果已解决）\n\n## 改进\n\n12. 发现规则不完善或缺失时记录到 `harness/feedback/improvement-log.md`\n13. 规则改进后同步更新 `harness/rules/` 下对应的文件\n14. 每次改进后检查是否有相关 `project-map` 文档需要同步更新\n\n## 任务结束\n\n15. 更新 `harness/project-map/change-map.md`，记录本次变更摘要\n16. 如果引入了新的命令或工作流，更新 `README.md` 和 `CLAUDE.md`\n",
+      "reason": "修复规则编号重复问题（原两条规则 3 和 4），消除编号不一致导致的混乱，确保每条规则有唯一编号"
+    }
+  ]
+}
+```
+
+**降级原因**: dry-run 模式
+
+---
+
+## 自我升级诊断 [降级] — `harness/rules/coding-rules.md`
+
+> 生成时间: 2026-05-27T05:41:06.406991+00:00
+> 状态: 待确认（降级 — dry-run 模式）
+
+**诊断结果**:
+```json
+{
+  "root_cause": "编码规则第11条使用了占位符 {{test_command}} 未替换为实际命令，导致结构验证失败时重复触发 improvement 信号",
+  "category": "missing_step",
+  "affected_files": [
+    "harness/rules/coding-rules.md"
+  ],
+  "fix_plan": [
+    {
+      "file": "harness/rules/coding-rules.md",
+      "type": "replace",
+      "content": "# Coding Rules\n\n可执行的编码规则，非口号。每条规则必须可验证。\n\n## 文件与目录\n\n1. 新增模块前必须在 `harness/project-map/module-map.md` 中登记模块名称、用途、依赖\n2. 新增目录后必须在 `harness/project-map/directory-map.md` 中更新目录结构\n3. 文件命名遵循项目约定的命名规范\n4. 每个 Python 脚本必须在文件头 3 行内包含一行描述其用途的注释\n\n## 代码变更\n\n5. 修改 CLI 命令后必须同步更新 `README.md` 和 `harness/project-map/command-map.md`\n6. 修改数据结构（类字段、文件格式）后必须同步更新 `harness/project-map/data-flow.md`\n7. 修改公开函数签名后必须更新 `harness/project-map/module-map.md` 中对应的接口说明\n8. 任何代码修改后必须运行项目配置的结构验证命令\n\n## 测试\n\n9. 新增功能必须在 `tests/` 下添加对应的测试文件\n10. 测试文件命名：`test_<模块名>.py`\n11. 修改代码后必须运行相关测试：`pytest tests/`\n\n## 注释\n\n12. 仅在 WHY 不明显时写注释——解释为什么这样做，而不是这段代码做了什么\n13. 不要写多行 docstring，一行描述即可\n14. 不要写\"由 XX 调用\"、\"用于 YY 场景\"之类的注释——这些信息在 commit message 或 PR 描述中\n",
+      "reason": "将占位符 {{test_command}} 替换为实际测试命令 `pytest tests/`，消除无效的引用标记，使规则可被结构验证工具正常检查"
+    }
+  ]
+}
+```
+
+**降级原因**: dry-run 模式

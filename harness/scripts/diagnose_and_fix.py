@@ -413,7 +413,7 @@ def _call_llm_diagnosis(target_file: str, rule_ref: str, history_signals: list[d
     user_prompt = f"请分析以下 rule_ref 的重复反馈信号并生成修复方案: {rule_ref}"
 
     print(f"[LLM] 正在调用诊断 API (model={config.get('model')}, max_tokens=4096, timeout=60)...")
-    response = _call_llm(system_prompt, user_prompt, config, max_tokens=4096, timeout=60, silent=False)
+    response, _ = _call_llm(system_prompt, user_prompt, config, max_tokens=4096, timeout=60, silent=False)
 
     if response is None:
         print("[LLM] API 调用失败或返回为空。")

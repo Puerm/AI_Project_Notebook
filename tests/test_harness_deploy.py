@@ -8,6 +8,7 @@ import sys
 import subprocess
 import tempfile
 import shutil
+from unittest.mock import patch
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJECT_ROOT not in sys.path:
@@ -844,3 +845,296 @@ class TestProjectYamlNewFields:
         ]
         for field in required:
             assert field in data, f"project.yaml 缺少字段: {field}"
+
+
+# ============================================================
+# TST-1: _llm_detect_project 错误输出到 stderr
+# ============================================================
+
+
+class TestLlmDetectErrorOutput:
+    """TST-1: _llm_detect_project 失败时错误输出到 stderr（plan 任务 TST-1）。"""
+
+    def test_api_exception_prints_to_stderr(self, capsys):
+        """API 调用异常时 stderr 包含 'API 调用异常' 且返回 None。"""
+        import app.analyzer.llm_assistant as llm_mod
+        from harness.scripts.harness_deploy import _llm_detect_project
+
+        tmp = tempfile.mkdtemp()
+        try:
+            with patch.object(llm_mod, "_get_llm_config",
+                              return_value={"api_key": "fake_key"}):
+                with patch.object(llm_mod, "_call_llm",
+                                  side_effect=ConnectionError("connection refused")):
+                    result = _llm_detect_project(tmp)
+
+            captured = capsys.readouterr()
+            assert result is None, (
+                f"API 异常时应返回 None，实际: {result}"
+            )
+            assert "API 调用异常" in captured.err, (
+                f"stderr 应包含 'API 调用异常'，实际:\n{captured.err}"
+            )
+            assert "connection refused" in captured.err, (
+                f"stderr 应包含具体异常信息，实际:\n{captured.err}"
+            )
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_empty_response_prints_to_stderr(self, capsys):
+        """API 返回空响应时 stderr 包含 '空响应' 且返回 None。"""
+        import app.analyzer.llm_assistant as llm_mod
+        from harness.scripts.harness_deploy import _llm_detect_project
+
+        tmp = tempfile.mkdtemp()
+        try:
+            with patch.object(llm_mod, "_get_llm_config",
+                              return_value={"api_key": "fake_key"}):
+                with patch.object(llm_mod, "_call_llm",
+                                  return_value=("", None)):
+                    result = _llm_detect_project(tmp)
+
+            captured = capsys.readouterr()
+            assert result is None, (
+                f"空响应时应返回 None，实际: {result}"
+            )
+            assert "API 返回空响应" in captured.err, (
+                f"stderr 应包含 'API 返回空响应'，实际:\n{captured.err}"
+            )
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_json_parse_error_prints_to_stderr(self, capsys):
+        """JSON 解析失败时 stderr 包含 'JSON 解析失败' 且返回 None。"""
+        import app.analyzer.llm_assistant as llm_mod
+        from harness.scripts.harness_deploy import _llm_detect_project
+
+        tmp = tempfile.mkdtemp()
+        try:
+            with patch.object(llm_mod, "_get_llm_config",
+                              return_value={"api_key": "fake_key"}):
+                # 返回包含花括号但内部是非法 JSON 的文本
+                with patch.object(llm_mod, "_call_llm",
+                                  return_value=("{broken json}", None)):
+                    result = _llm_detect_project(tmp)
+
+            captured = capsys.readouterr()
+            assert result is None, (
+                f"JSON 解析失败时应返回 None，实际: {result}"
+            )
+            assert "JSON 解析失败" in captured.err, (
+                f"stderr 应包含 'JSON 解析失败'，实际:\n{captured.err}"
+            )
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_no_json_object_prints_to_stderr(self, capsys):
+        """响应中无 JSON 对象时 stderr 包含 '未找到 JSON 对象' 且返回 None。"""
+        import app.analyzer.llm_assistant as llm_mod
+        from harness.scripts.harness_deploy import _llm_detect_project
+
+        tmp = tempfile.mkdtemp()
+        try:
+            with patch.object(llm_mod, "_get_llm_config",
+                              return_value={"api_key": "fake_key"}):
+                # 返回没有任何花括号的纯文本
+                with patch.object(llm_mod, "_call_llm",
+                                  return_value=("plain text without any braces", None)):
+                    result = _llm_detect_project(tmp)
+
+            captured = capsys.readouterr()
+            assert result is None, (
+                f"无 JSON 对象时应返回 None，实际: {result}"
+            )
+            assert "未找到 JSON 对象" in captured.err, (
+                f"stderr 应包含 '未找到 JSON 对象'，实际:\n{captured.err}"
+            )
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ============================================================
+# TST-2: detect_project focus_fields 模式成功判断
+# ============================================================
+
+
+class TestDetectProjectFocusMode:
+    """TST-2: detect_project focus_fields 模式成功判断和完整模式行为不变
+    （plan 任务 TST-2）。"""
+
+    def test_focus_mode_llm_success(self, capsys):
+        """focus_fields 模式 LLM 返回非空 dict → 'LLM 检测成功' 且 source='llm'。
+        验证 domain/description/entry_point 从 LLM 正确合并。"""
+        from harness.scripts.harness_deploy import detect_project
+
+        tmp = tempfile.mkdtemp()
+        try:
+            with open(os.path.join(tmp, "main.py"), "w") as f:
+                f.write("print('hello')")
+
+            baseline = {
+                "project_name": "TestProject",
+                "languages": ["python"],
+                "framework": "Flask",
+                "domain": "",
+                "description": "",
+                "entry_point": "",
+            }
+
+            with patch("harness.scripts.harness_deploy._check_llm_available",
+                       return_value=True):
+                with patch("harness.scripts.harness_deploy._llm_detect_project",
+                           return_value={"domain": "Web",
+                                         "description": "test desc",
+                                         "entry_point": "app.py"}):
+                    result = detect_project(tmp, baseline=baseline)
+
+            captured = capsys.readouterr()
+            assert "LLM 检测成功" in captured.out, (
+                f"focus 模式 LLM 成功时应输出 'LLM 检测成功'，"
+                f"实际 stdout:\n{captured.out}"
+            )
+            assert result["source"] == "llm", (
+                f"LLM 成功时 source 应为 'llm'，实际: {result['source']}"
+            )
+            assert result["domain"] == "Web", (
+                f"LLM 返回的 domain 应被合并，实际: {result['domain']}"
+            )
+            assert result["description"] == "test desc", (
+                f"LLM 返回的 description 应被合并，实际: {result['description']}"
+            )
+            assert result["entry_point"] == "app.py", (
+                f"LLM 返回的 entry_point 应被合并，实际: {result['entry_point']}"
+            )
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_focus_mode_llm_failure(self, capsys):
+        """focus_fields 模式 LLM 返回 None → 'LLM 检测失败，降级为静态检测'。"""
+        from harness.scripts.harness_deploy import detect_project
+
+        tmp = tempfile.mkdtemp()
+        try:
+            with open(os.path.join(tmp, "main.py"), "w") as f:
+                f.write("print('hello')")
+
+            baseline = {
+                "project_name": "TestProject",
+                "languages": ["python"],
+                "framework": "Flask",
+                "domain": "",
+                "description": "",
+                "entry_point": "",
+            }
+
+            with patch("harness.scripts.harness_deploy._check_llm_available",
+                       return_value=True):
+                with patch("harness.scripts.harness_deploy._llm_detect_project",
+                           return_value=None):
+                    result = detect_project(tmp, baseline=baseline)
+
+            captured = capsys.readouterr()
+            assert "LLM 检测失败" in captured.out, (
+                f"focus 模式 LLM 失败时应输出降级信息，实际 stdout:\n{captured.out}"
+            )
+            assert "降级为静态检测" in captured.out, (
+                f"应包含 '降级为静态检测'，实际 stdout:\n{captured.out}"
+            )
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_full_mode_llm_success(self, capsys):
+        """完整模式（无 baseline）LLM 返回含 languages 的 dict →
+        'LLM 检测成功' 行为不变。"""
+        from harness.scripts.harness_deploy import detect_project
+
+        tmp = tempfile.mkdtemp()
+        try:
+            with open(os.path.join(tmp, "main.py"), "w") as f:
+                f.write("print('hello')")
+
+            with patch("harness.scripts.harness_deploy._check_llm_available",
+                       return_value=True):
+                with patch("harness.scripts.harness_deploy._llm_detect_project",
+                           return_value={
+                               "languages": ["python"],
+                               "framework": "Flask",
+                               "domain": "Web",
+                               "description": "A web app",
+                               "entry_point": "main.py",
+                           }):
+                    result = detect_project(tmp, baseline=None)
+
+            captured = capsys.readouterr()
+            assert "LLM 检测成功" in captured.out, (
+                f"完整模式 LLM 成功时应输出 'LLM 检测成功'，"
+                f"实际 stdout:\n{captured.out}"
+            )
+            assert result["source"] == "llm", (
+                f"LLM 成功时 source 应为 'llm'，实际: {result['source']}"
+            )
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_full_mode_llm_failure(self, capsys):
+        """完整模式（无 baseline）LLM 返回 None →
+        'LLM 检测失败，降级为静态检测' 行为不变。"""
+        from harness.scripts.harness_deploy import detect_project
+
+        tmp = tempfile.mkdtemp()
+        try:
+            with open(os.path.join(tmp, "main.py"), "w") as f:
+                f.write("print('hello')")
+
+            with patch("harness.scripts.harness_deploy._check_llm_available",
+                       return_value=True):
+                with patch("harness.scripts.harness_deploy._llm_detect_project",
+                           return_value=None):
+                    result = detect_project(tmp, baseline=None)
+
+            captured = capsys.readouterr()
+            assert "LLM 检测失败" in captured.out, (
+                f"完整模式 LLM 失败时应输出降级信息，实际 stdout:\n{captured.out}"
+            )
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_focus_mode_llm_success_reuses_baseline(self, capsys):
+        """focus 模式成功时 baseline 的已有字段不被 LLM 覆盖。"""
+        from harness.scripts.harness_deploy import detect_project
+
+        tmp = tempfile.mkdtemp()
+        try:
+            with open(os.path.join(tmp, "main.py"), "w") as f:
+                f.write("print('hello')")
+
+            baseline = {
+                "project_name": "PreservedProject",
+                "languages": ["python"],
+                "framework": "ExistingFramework",
+                "domain": "",
+                "description": "",
+                "entry_point": "",
+            }
+
+            with patch("harness.scripts.harness_deploy._check_llm_available",
+                       return_value=True):
+                with patch("harness.scripts.harness_deploy._llm_detect_project",
+                           return_value={"domain": "Web",
+                                         "description": "test",
+                                         "entry_point": "app.py"}):
+                    result = detect_project(tmp, baseline=baseline)
+
+            assert result["project_name"] == "PreservedProject", (
+                f"baseline 的 project_name 应保留，"
+                f"实际: {result['project_name']}"
+            )
+            assert result["framework"] == "ExistingFramework", (
+                f"baseline 的 framework 应保留，"
+                f"实际: {result['framework']}"
+            )
+            assert result["domain"] == "Web", (
+                f"LLM 的 domain 应被合并，实际: {result['domain']}"
+            )
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)

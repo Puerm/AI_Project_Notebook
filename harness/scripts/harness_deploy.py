@@ -294,11 +294,13 @@ def _llm_detect_project(target_path, focus_fields=None):
 """
 
     try:
-        response = _call_llm(system_prompt, user_prompt, config, max_tokens=1024, timeout=60)
-    except Exception:
+        response, _ = _call_llm(system_prompt, user_prompt, config, max_tokens=1024, timeout=60)
+    except Exception as e:
+        print(f"  [LLM] API 调用异常: {e}", file=sys.stderr)
         return None
 
     if not response:
+        print("  [LLM] API 返回空响应", file=sys.stderr)
         return None
 
     try:
@@ -308,8 +310,10 @@ def _llm_detect_project(target_path, focus_fields=None):
         if json_start >= 0 and json_end > json_start:
             result = json.loads(response[json_start:json_end])
         else:
+            print("  [LLM] 响应中未找到 JSON 对象", file=sys.stderr)
             return None
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        print(f"  [LLM] JSON 解析失败: {e}", file=sys.stderr)
         return None
 
     return result
@@ -350,6 +354,8 @@ def detect_project(target_path, baseline=None):
         print("  未检测到 project.yaml，执行完整检测。")
 
     llm_result = None
+    is_focus_mode = False
+    llm_attempted = False
     if has_llm:
         print("  LLM API Key 已配置，使用 LLM 增强检测...")
         if baseline:
@@ -357,16 +363,23 @@ def detect_project(target_path, baseline=None):
             missing_fields = [k for k in ("domain", "description", "entry_point")
                             if not baseline.get(k) or baseline.get(k) == "待确认"]
             if missing_fields:
+                is_focus_mode = True
+                llm_attempted = True
                 llm_result = _llm_detect_project(target_path, focus_fields=missing_fields)
             else:
                 print("  所有字段已有值，跳过 LLM 检测。")
                 llm_result = None
         else:
+            llm_attempted = True
             llm_result = _llm_detect_project(target_path)
-        if llm_result and "languages" in llm_result:
+        if is_focus_mode:
+            llm_success = bool(llm_result and isinstance(llm_result, dict) and llm_result)
+        else:
+            llm_success = bool(llm_result and "languages" in llm_result)
+        if llm_success:
             print("  LLM 检测成功")
         else:
-            if not baseline or missing_fields:
+            if llm_attempted:
                 print("  LLM 检测失败，降级为静态检测")
             llm_result = None
     else:
@@ -384,19 +397,20 @@ def detect_project(target_path, baseline=None):
             result["languages"] = [result["languages"]]
 
     # LLM 增强：补充 baseline 中的缺失字段
-    if llm_result and llm_result.get("languages"):
-        primary_lang = llm_result.get("languages", [""])[0]
-        if not result.get("languages"):
-            result["languages"] = llm_result.get("languages", static_result["languages"])
-        if not result.get("framework") or result.get("framework") == "unknown":
-            result["framework"] = llm_result.get("framework", static_result.get("framework", "unknown"))
+    if llm_result:
+        if llm_result.get("languages"):
+            primary_lang = llm_result.get("languages", [""])[0]
+            if not result.get("languages"):
+                result["languages"] = llm_result.get("languages", static_result["languages"])
+            if not result.get("framework") or result.get("framework") == "unknown":
+                result["framework"] = llm_result.get("framework", static_result.get("framework", "unknown"))
         if not result.get("domain") or result.get("domain") == "待确认":
             result["domain"] = llm_result.get("domain", "")
         if not result.get("description"):
             result["description"] = llm_result.get("description", "")
         if not result.get("entry_point"):
             result["entry_point"] = llm_result.get("entry_point", entry_point or "")
-        result["source"] = "llm" if baseline else "llm"
+        result["source"] = "llm"
     else:
         if not baseline:
             result = static_result
@@ -500,7 +514,7 @@ def _adapt_agent_content(content, features, has_llm):
 {zone}
 """
         try:
-            response = _call_llm(system_prompt, user_prompt, config, max_tokens=2048, timeout=60)
+            response, _ = _call_llm(system_prompt, user_prompt, config, max_tokens=2048, timeout=60)
         except Exception:
             response = None
 
@@ -601,7 +615,7 @@ def _adapt_rule_content(content, features, has_llm):
 {result}
 """
     try:
-        response = _call_llm(system_prompt, user_prompt, config, max_tokens=3072, timeout=60)
+        response, _ = _call_llm(system_prompt, user_prompt, config, max_tokens=3072, timeout=60)
     except Exception:
         return result
 

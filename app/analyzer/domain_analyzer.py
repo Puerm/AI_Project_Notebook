@@ -29,7 +29,7 @@ def analyze_business_domains(guiding_files_result, dir_summary, project_name,
     if codegraph_context:
         prompt += f"\n\n# CodeGraph 符号知识图谱发现\n\n{codegraph_context}\n\n请综合以上图谱发现优化业务板块识别，特别是调用关系/模块依赖信息。"
 
-    result = _call_llm(
+    result, err_info = _call_llm(
         system_prompt=(
             "你是一位资深软件架构师，擅长从代码仓库中识别用户可见的业务功能模块。"
             "你的分析基于引导文件（README、依赖清单、CI配置）和目录结构摘要。"
@@ -46,6 +46,13 @@ def analyze_business_domains(guiding_files_result, dir_summary, project_name,
     )
 
     if result is None:
+        if err_info:
+            status = err_info.get("status", "?")
+            reason = err_info.get("reason", "unknown")
+            prompt_bytes = len(prompt.encode("utf-8"))
+            print(f"[domain_analyzer] LLM 调用失败 — HTTP {status}: {reason} | prompt 大小: {prompt_bytes} bytes", file=sys.stderr)
+        else:
+            print(f"[domain_analyzer] LLM 调用失败 — 未获取到错误详情 | prompt 大小: {len(prompt.encode('utf-8'))} bytes", file=sys.stderr)
         return _degraded_domain_result(project_name)
 
     parsed = _parse_domain_response(result)

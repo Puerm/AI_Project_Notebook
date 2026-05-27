@@ -4,6 +4,30 @@
 
 ## 变更记录
 
+### 2026-05-27: 修复 LLM 检测成功判断逻辑 — stderr 错误输出 + focus_fields 模式成功判断
+
+- **类型**: 修复
+- **范围**: `harness/scripts/harness_deploy.py` (1 文件)
+- **摘要**: 修复 `_llm_detect_project` 和 `detect_project` 两个 bug
+  - **IMP-1**: `_llm_detect_project` — 4 个异常分支增加 stderr 输出：API 调用异常 / 空响应 / JSON 解析失败 / 未找到 JSON 对象，异常变量改为 `except Exception as e` 避免丢信息
+  - **IMP-2**: `detect_project` — focus_fields 模式成功判断从硬编码 `"languages" in llm_result` 改为模式感知：focus 模式判断 `isinstance(llm_result, dict) and bool(llm_result)`，完整模式保持 `"languages" in llm_result`；引入 `is_focus_mode`/`llm_attempted` 消除 `missing_fields` 作用域隐患；result merging 拆分 `languages`/`framework`（仅完整模式）和 `domain`/`description`/`entry_point`/`source`（两者均适用）的外层条件
+- **验证**: `check_structure.py` 52/52 PASS, `pytest tests/test_harness_deploy.py` 55/55 PASS
+
+### 2026-05-27: 修复维度分析 Prompt 溢出
+
+- **类型**: 修复
+- **范围**: 4 修改 + 3 文档更新
+- **摘要**: 修复 LLM 聚焦分析中 prompt 超大导致 HTTP 400 溢出的问题，三层防线控制
+  - **IMP-1**: `llm_assistant.py` — `_call_llm` 返回值从 `str|None` 改为元组 `(str|None, dict|None)`，HTTPError 返回 `(None, {"status": code, "reason": reason})`
+  - **IMP-2**: `domain_analyzer.py` — 适配元组返回值 + 增强 err_info 诊断日志；`test_analyze_project.py` 断言同步更新
+  - **IMP-3**: `digest_collector.py` — `filter_for_risk` 增加优先级排序（依赖>配置>脚本>错误处理路径>安全关键词）+ 两遍去重
+  - **IMP-4**: `digest_collector.py` — 三个 filter 函数增加文件数上限（架构100/用户故事150/风险200），超出截断并打印 warning
+  - **IMP-5**: `digest_collector.py` — 新增 `estimate_tokens()` + `format_files_for_llm()` 支持 `max_tokens` 参数，超出预算截断并追加截断标注
+  - **IMP-6**: `dimension_analyzer.py` — 新增 `_get_model_context_limit()` + `_compute_token_budget()`；三个 builder 函数接入 token 预算；`_call_llm_with_retry` 检测 HTTP 400 跳过重试
+  - **IMP-7**: 确认 `analyze_project.py` 无需修改
+- **影响文件**: `app/analyzer/llm_assistant.py`, `app/analyzer/domain_analyzer.py`, `app/analyzer/digest_collector.py`, `app/analyzer/dimension_analyzer.py`, `tests/test_analyze_project.py`, `harness/project-map/module-map.md`, `harness/project-map/change-map.md`
+- **验证**: `python harness/scripts/check_structure.py` 52/52 PASS, `python -m pytest tests/test_analyze_project.py tests/test_digest_collector.py` -v 92/92 PASS
+
 ### 2026-05-26: CodeGraph 集成 — 图谱增强项目分析
 
 - **类型**: 新功能

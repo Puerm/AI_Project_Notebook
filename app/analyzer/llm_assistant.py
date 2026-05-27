@@ -54,9 +54,9 @@ def _get_llm_config(enable_dotenv=True):
 
 
 def _call_llm(system_prompt, user_prompt, config, max_tokens=256, timeout=10, silent=False):
-    """通过 urllib 调用 LLM API，返回响应文本或 None。"""
+    """通过 urllib 调用 LLM API，返回 (响应文本或None, 错误信息dict或None)。"""
     if not config["api_key"]:
-        return None
+        return (None, None)
 
     if config["provider"] == "anthropic":
         url = (config.get("api_base") or "https://api.anthropic.com") + "/v1/messages"
@@ -97,22 +97,22 @@ def _call_llm(system_prompt, user_prompt, config, max_tokens=256, timeout=10, si
             except Exception:
                 err_body = "(unable to read response body)"
             print(f"[LLM] HTTP {e.code} {e.reason} — {err_body}", file=sys.stderr)
-        return None
+        return (None, {"status": e.code, "reason": e.reason})
     except (urllib.error.URLError, json.JSONDecodeError, TimeoutError, OSError) as e:
         if not silent:
             print(f"[LLM] API 调用失败: {e}", file=sys.stderr)
-        return None
+        return (None, {"status": 0, "reason": str(e)})
 
     if config["provider"] == "anthropic":
         content = data.get("content", [])
         if content and isinstance(content, list):
-            return content[0].get("text", "").strip()
+            return (content[0].get("text", "").strip(), None)
     else:
         choices = data.get("choices", [])
         if choices:
-            return choices[0].get("message", {}).get("content", "").strip()
+            return (choices[0].get("message", {}).get("content", "").strip(), None)
 
-    return None
+    return (None, None)
 
 
 def _call_llm_with_tools(system_prompt, user_prompt, tools_def, tool_handler, config,

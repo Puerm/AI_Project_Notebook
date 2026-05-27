@@ -11,6 +11,34 @@ from app.analyzer.digest_collector import format_files_for_llm
 RETRY_MAX = 3
 RETRY_BASE_DELAY = 2
 
+# 已知模型的上下文窗口 token 上限
+_MODEL_CONTEXT_LIMITS = {
+    "gpt-4o-mini": 128000,
+    "gpt-4o": 128000,
+    "claude-3-5-sonnet": 200000,
+    "claude-3-opus": 200000,
+    "deepseek": 65536,
+}
+_DEFAULT_CONTEXT_LIMIT = 128000
+_MIN_TOKEN_BUDGET = 16000
+_TOKEN_BUDGET_RATIO = 0.8  # 使用模型上下文窗口的 80% 作为上限
+
+
+def _get_model_context_limit(model_name: str) -> int:
+    """返回模型上下文窗口的 token 上限。"""
+    if not model_name:
+        return _DEFAULT_CONTEXT_LIMIT
+    for prefix, limit in _MODEL_CONTEXT_LIMITS.items():
+        if model_name.lower().startswith(prefix):
+            return limit
+    return _DEFAULT_CONTEXT_LIMIT
+
+
+def _compute_token_budget(config: dict) -> int:
+    """根据模型上下文窗口计算 token 预算。"""
+    limit = _get_model_context_limit(config.get("model", ""))
+    return max(int(limit * _TOKEN_BUDGET_RATIO), _MIN_TOKEN_BUDGET)
+
 
 def _check_llm_available(enable_dotenv=True):
     """检查 LLM API Key 是否可用。"""
@@ -30,18 +58,20 @@ def _write_analysis_file(output_dir, filename, content):
     return file_path
 
 
-def _build_architecture_prompt_from_files(filtered_files, project_name):
+def _build_architecture_prompt_from_files(filtered_files, project_name, config=None):
     """基于筛选后的文件子集构造架构分析用户 prompt。"""
-    files_text = format_files_for_llm(filtered_files)
+    max_tokens = _compute_token_budget(config) if config else None
+    files_text = format_files_for_llm(filtered_files, max_tokens=max_tokens)
     return load_prompt("architecture").format(
         project_name=project_name,
         files_content=files_text,
     )
 
 
-def _build_stories_prompt_from_files(filtered_files, arch_text, project_name):
+def _build_stories_prompt_from_files(filtered_files, arch_text, project_name, config=None):
     """基于筛选后的文件子集构造用户故事分析用户 prompt。"""
-    files_text = format_files_for_llm(filtered_files)
+    max_tokens = _compute_token_budget(config) if config else None
+    files_text = format_files_for_llm(filtered_files, max_tokens=max_tokens)
     arch_context = arch_text[:2000] if arch_text else "(架构分析不可用)"
     prompt_template = load_prompt("user_stories")
     user_prompt = prompt_template.format(
@@ -52,9 +82,10 @@ def _build_stories_prompt_from_files(filtered_files, arch_text, project_name):
     return user_prompt
 
 
-def _build_risk_prompt_from_files(filtered_files, arch_text, stories_text, project_name):
+def _build_risk_prompt_from_files(filtered_files, arch_text, stories_text, project_name, config=None):
     """基于筛选后的文件子集构造风险分析用户 prompt。"""
-    files_text = format_files_for_llm(filtered_files)
+    max_tokens = _compute_token_budget(config) if config else None
+    files_text = format_files_for_llm(filtered_files, max_tokens=max_tokens)
     arch_summary = arch_text[:1500] if arch_text else "(架构分析不可用)"
     stories_summary = stories_text[:1500] if stories_text else "(用户故事分析不可用)"
     prompt_template = load_prompt("risk")
@@ -68,12 +99,12 @@ def _build_risk_prompt_from_files(filtered_files, arch_text, stories_text, proje
 
 
 def _call_llm_with_retry(system_prompt, user_prompt, config, max_tokens=4096, timeout=120):
-    """调用 LLM，失败时自动重试（最多 3 次，指数退避）。"""
+    """调用 LLM，失败时自动重试（最多 3 次，指数退避），HTTP 400 不重试。"""
     last_error = None
     for attempt in range(1, RETRY_MAX + 1):
         # 非最后一次重试时静默，最后一次暴露真实错误
         is_last = attempt == RETRY_MAX
-        result = _call_llm(
+        result, err_info = _call_llm(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             config=config,
@@ -85,6 +116,10 @@ def _call_llm_with_retry(system_prompt, user_prompt, config, max_tokens=4096, ti
             if attempt > 1:
                 print(f"  [重试成功] 第 {attempt} 次调用成功", file=sys.stderr)
             return result
+        # HTTP 400 表示请求过大等硬错误，跳过重试
+        if err_info and err_info.get("status") == 400:
+            print("[HTTP 400] 请求过大，跳过重试，降级处理", file=sys.stderr)
+            return None
         if attempt < RETRY_MAX:
             delay = RETRY_BASE_DELAY ** attempt
             print(f"  [重试 {attempt}/{RETRY_MAX}] API 调用失败，{delay}s 后重试...", file=sys.stderr)
@@ -200,7 +235,7 @@ def analyze_architecture(filtered_files, project_name, output_dir, enable_dotenv
         file_path = _write_analysis_file(output_dir, "architecture.md", content)
         return {"file_path": file_path, "status": "degraded", "content": content}
 
-    user_prompt = _build_architecture_prompt_from_files(filtered_files, project_name)
+    user_prompt = _build_architecture_prompt_from_files(filtered_files, project_name, config=config)
     if codegraph_context:
         user_prompt += (
             f"\n\n# CodeGraph 符号知识图谱发现\n\n{codegraph_context}\n\n"
@@ -235,7 +270,7 @@ def analyze_user_stories(filtered_files, arch_md_text, project_name, output_dir,
         file_path = _write_analysis_file(output_dir, "user-stories.md", content)
         return {"file_path": file_path, "status": "degraded", "content": content}
 
-    user_prompt = _build_stories_prompt_from_files(filtered_files, arch_md_text, project_name)
+    user_prompt = _build_stories_prompt_from_files(filtered_files, arch_md_text, project_name, config=config)
     if codegraph_context:
         user_prompt += (
             f"\n\n# CodeGraph 符号知识图谱发现\n\n{codegraph_context}\n\n"
@@ -270,7 +305,7 @@ def analyze_risk(filtered_files, arch_md_text, stories_md_text, project_name, ou
         file_path = _write_analysis_file(output_dir, "risk-analysis.md", content)
         return {"file_path": file_path, "status": "degraded", "content": content}
 
-    user_prompt = _build_risk_prompt_from_files(filtered_files, arch_md_text, stories_md_text, project_name)
+    user_prompt = _build_risk_prompt_from_files(filtered_files, arch_md_text, stories_md_text, project_name, config=config)
     if codegraph_context:
         user_prompt += (
             f"\n\n# CodeGraph 符号知识图谱发现\n\n{codegraph_context}\n\n"

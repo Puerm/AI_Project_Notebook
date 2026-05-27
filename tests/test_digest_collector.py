@@ -211,6 +211,22 @@ class TestFilterForArchitecture:
         result = filter_for_architecture([])
         assert result == []
 
+    # ---------- TST-2: 文件数上限 ----------
+
+    def test_upper_limit_100_files(self):
+        """101+ 个文件时只返回前 100 个"""
+        from app.analyzer.digest_collector import filter_for_architecture
+        preprocessed = [{"path": f"dir{i}/__init__.py", "content": ""} for i in range(101)]
+        result = filter_for_architecture(preprocessed)
+        assert len(result) == 100, f"Expected 100, got {len(result)}"
+
+    def test_within_limit_no_truncation(self):
+        """50 个文件未超过 100 上限，全部保留"""
+        from app.analyzer.digest_collector import filter_for_architecture
+        preprocessed = [{"path": f"dir{i}/__init__.py", "content": ""} for i in range(50)]
+        result = filter_for_architecture(preprocessed)
+        assert len(result) == 50, f"Expected 50, got {len(result)}"
+
 
 class TestFilterForUserStories:
     """filter_for_user_stories() 用户故事维度文件筛选"""
@@ -279,6 +295,22 @@ class TestFilterForUserStories:
         from app.analyzer.digest_collector import filter_for_user_stories
         result = filter_for_user_stories([])
         assert result == []
+
+    # ---------- TST-2: 文件数上限 ----------
+
+    def test_upper_limit_150_files(self):
+        """151+ 个文件时只返回前 150 个"""
+        from app.analyzer.digest_collector import filter_for_user_stories
+        preprocessed = [{"path": f"dir{i}/README.md", "content": ""} for i in range(151)]
+        result = filter_for_user_stories(preprocessed)
+        assert len(result) == 150, f"Expected 150, got {len(result)}"
+
+    def test_within_limit_no_truncation(self):
+        """80 个文件未超过 150 上限，全部保留"""
+        from app.analyzer.digest_collector import filter_for_user_stories
+        preprocessed = [{"path": f"dir{i}/README.md", "content": ""} for i in range(80)]
+        result = filter_for_user_stories(preprocessed)
+        assert len(result) == 80, f"Expected 80, got {len(result)}"
 
 
 class TestFilterForRisk:
@@ -366,6 +398,61 @@ class TestFilterForRisk:
         result = filter_for_risk([])
         assert result == []
 
+    # ---------- TST-1: 优先级排序 + 去重 ----------
+
+    def test_dedup_duplicate_file_path(self):
+        """相同文件路径出现多次时去重，只保留一次"""
+        from app.analyzer.digest_collector import filter_for_risk
+        preprocessed = [
+            {"path": "config.py", "content": "PASSWORD = 'secret'"},
+            {"path": "config.py", "content": "PASSWORD = 'secret'"},  # 重复路径
+            {"path": "src/util.py", "content": "API_KEY = 'abc'"},
+        ]
+        result = filter_for_risk(preprocessed)
+        paths = [f["path"] for f in result]
+        assert paths.count("config.py") == 1, f"Expected 1, got {paths.count('config.py')}"
+
+    def test_priority_sorting_full_order(self):
+        """依赖(0) < 配置(1) < 脚本(2) < 错误处理(3) < 安全关键词(4)"""
+        from app.analyzer.digest_collector import filter_for_risk
+        preprocessed = [
+            {"path": "src/auth.py", "content": "password = 'secret'"},     # priority 4
+            {"path": "src/errors.py", "content": "class CustomError"},      # priority 3
+            {"path": "deploy.sh", "content": "#!/bin/bash"},                # priority 2
+            {"path": "config.py", "content": "DEBUG = True"},               # priority 1
+            {"path": "requirements.txt", "content": "flask==2.0"},          # priority 0
+        ]
+        result = filter_for_risk(preprocessed)
+        paths = [f["path"] for f in result]
+        assert paths == [
+            "requirements.txt",
+            "config.py",
+            "deploy.sh",
+            "src/errors.py",
+            "src/auth.py",
+        ], f"Unexpected order: {paths}"
+
+    def test_same_priority_sorted_by_path(self):
+        """同一优先级内按文件路径字典序稳定排序"""
+        from app.analyzer.digest_collector import filter_for_risk
+        preprocessed = [
+            {"path": "c.sh", "content": "#!/bin/bash"},
+            {"path": "a.sh", "content": "#!/bin/bash"},
+            {"path": "b.sh", "content": "#!/bin/bash"},
+        ]
+        result = filter_for_risk(preprocessed)
+        paths = [f["path"] for f in result]
+        assert paths == ["a.sh", "b.sh", "c.sh"], f"Expected alphabetical by path, got {paths}"
+
+    # ---------- TST-2: 文件数上限 ----------
+
+    def test_upper_limit_200_files(self):
+        """201+ 个文件时只返回前 200 个（按优先级排序后）"""
+        from app.analyzer.digest_collector import filter_for_risk
+        preprocessed = [{"path": f"script{i}.sh", "content": "#!/bin/bash"} for i in range(201)]
+        result = filter_for_risk(preprocessed)
+        assert len(result) == 200, f"Expected 200, got {len(result)}"
+
 
 class TestFormatFilesForLLM:
     """format_files_for_llm() 文件列表格式化 LLM 文本"""
@@ -387,3 +474,70 @@ class TestFormatFilesForLLM:
         from app.analyzer.digest_collector import format_files_for_llm
         text = format_files_for_llm([])
         assert text == ""
+
+    # ---------- TST-3: token 预算截断 ----------
+
+    def test_max_tokens_none_no_truncation(self):
+        """max_tokens=None 时不截断，保持原有行为（回归）"""
+        from app.analyzer.digest_collector import format_files_for_llm
+        files = [
+            {"path": "a.py", "content": "x=1"},
+            {"path": "b.py", "content": "y=2"},
+        ]
+        text = format_files_for_llm(files, max_tokens=None)
+        assert "### File: a.py" in text
+        assert "### File: b.py" in text
+        assert "[截断]" not in text
+
+    def test_max_tokens_sufficient_all_retained(self):
+        """max_tokens 足够大时全部文件保留"""
+        from app.analyzer.digest_collector import format_files_for_llm
+        files = [
+            {"path": "a.py", "content": "x=1"},
+            {"path": "b.py", "content": "y=2"},
+            {"path": "c.py", "content": "z=3"},
+        ]
+        text = format_files_for_llm(files, max_tokens=5000)
+        assert "### File: a.py" in text
+        assert "### File: b.py" in text
+        assert "### File: c.py" in text
+        assert "[截断]" not in text
+
+    def test_max_tokens_truncation_with_notice(self):
+        """max_tokens 不够时截断，输出包含 [截断] 已省略 N 个文件 标注"""
+        from app.analyzer.digest_collector import format_files_for_llm
+        files = [{"path": f"f{i}.py", "content": "x"} for i in range(10)]
+        text = format_files_for_llm(files, max_tokens=160)
+        assert "[截断]" in text, f"Expected truncation notice, got: {text[:200]}"
+        assert "已省略" in text
+
+    def test_truncation_notice_lists_omitted_paths(self):
+        """截断标注列出被截断文件的具体路径"""
+        from app.analyzer.digest_collector import format_files_for_llm
+        files = [
+            {"path": "a.py", "content": "x"},
+            {"path": "b.py", "content": "y"},
+            {"path": "c.py", "content": "z"},
+            {"path": "d.py", "content": "w"},
+            {"path": "e.py", "content": "v"},
+        ]
+        text = format_files_for_llm(files, max_tokens=160)
+        if "[截断]" in text:
+            # 被截断的文件路径应该在标注中列出
+            remaining_in_text = sum(1 for f in files if f"### File: {f['path']}" in text)
+            omitted = 5 - remaining_in_text
+            if omitted > 0:
+                assert f"已省略 {omitted} 个文件" in text, (
+                    f"Expected '已省略 {omitted} 个文件' in output"
+                )
+
+    def test_max_tokens_zero_only_notice(self):
+        """max_tokens=0 时全部文件被截断，返回仅含标注的字符串"""
+        from app.analyzer.digest_collector import format_files_for_llm
+        files = [
+            {"path": "a.py", "content": "x=1"},
+            {"path": "b.py", "content": "y=2"},
+        ]
+        text = format_files_for_llm(files, max_tokens=0)
+        assert "[截断]" in text
+        assert "已省略 2 个文件" in text

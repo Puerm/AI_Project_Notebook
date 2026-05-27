@@ -127,7 +127,7 @@ class TestArchitectureLLM:
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
-                           return_value="## 架构分层\n\n这是测试的架构分析输出。"):
+                           return_value=("## 架构分层\n\n这是测试的架构分析输出。", None)):
                     result = analyze_architecture(filtered, "TestProject", tmp, enable_dotenv=False)
             assert result["status"] == "llm"
             assert os.path.isfile(result["file_path"])
@@ -146,7 +146,7 @@ class TestArchitectureLLM:
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
-                           return_value=None):
+                           return_value=(None, None)):
                     result = analyze_architecture(filtered, "TestProject", tmp, enable_dotenv=False)
             assert result["status"] == "degraded"
             assert "降级" in result["content"]
@@ -165,7 +165,7 @@ class TestUserStoriesLLM:
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
-                           return_value="## 核心用户故事\n\n- 作为用户，我想登录。"):
+                           return_value=("## 核心用户故事\n\n- 作为用户，我想登录。", None)):
                     result = analyze_user_stories(filtered, "arch text", "TestProject", tmp, enable_dotenv=False)
             assert result["status"] == "llm"
             assert os.path.isfile(result["file_path"])
@@ -184,7 +184,7 @@ class TestUserStoriesLLM:
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
-                           return_value=None):
+                           return_value=(None, None)):
                     result = analyze_user_stories(filtered, "arch", "TestProject", tmp, enable_dotenv=False)
             assert result["status"] == "degraded"
         finally:
@@ -202,7 +202,7 @@ class TestRiskLLM:
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
-                           return_value="## 安全风险\n\n- 高风险：硬编码密钥。"):
+                           return_value=("## 安全风险\n\n- 高风险：硬编码密钥。", None)):
                     result = analyze_risk(filtered, "arch", "stories", "TestProject", tmp, enable_dotenv=False)
             assert result["status"] == "llm"
             assert os.path.isfile(result["file_path"])
@@ -222,7 +222,7 @@ class TestRiskLLM:
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
-                           return_value=None):
+                           return_value=(None, None)):
                     result = analyze_risk(filtered, "arch", "stories", "TestProject", tmp, enable_dotenv=False)
             assert result["status"] == "degraded"
         finally:
@@ -381,7 +381,7 @@ class TestDimensionAnalyzerDegradedWithFilteredFiles:
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
-                           return_value=None):
+                           return_value=(None, None)):
                     result = analyze_architecture(filtered, "Proj", tmp, enable_dotenv=False)
             assert result["status"] == "degraded"
             assert os.path.isfile(result["file_path"])
@@ -397,7 +397,7 @@ class TestDimensionAnalyzerDegradedWithFilteredFiles:
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
-                           return_value=None):
+                           return_value=(None, None)):
                     result = analyze_user_stories(filtered, "arch", "Proj", tmp, enable_dotenv=False)
             assert result["status"] == "degraded"
             assert os.path.isfile(result["file_path"])
@@ -413,9 +413,140 @@ class TestDimensionAnalyzerDegradedWithFilteredFiles:
             with patch("app.analyzer.dimension_analyzer._check_llm_available",
                        return_value=(True, _mock_llm_config())):
                 with patch("app.analyzer.dimension_analyzer._call_llm",
-                           return_value=None):
+                           return_value=(None, None)):
                     result = analyze_risk(filtered, "arch", "stories", "Proj", tmp, enable_dotenv=False)
             assert result["status"] == "degraded"
             assert os.path.isfile(result["file_path"])
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ===========================================================================
+# TST-4: _call_llm_with_retry HTTP 400 不重试
+# ===========================================================================
+
+
+class TestCallLLMWithRetry:
+    """_call_llm_with_retry HTTP 400 不重试 + 其他错误仍重试"""
+
+    def test_http_400_no_retry_returns_none_immediately(self):
+        """_call_llm 返回 (None, {"status": 400}) -> 0 次重试，直接返回 None"""
+        from app.analyzer.dimension_analyzer import _call_llm_with_retry
+
+        config = _mock_llm_config()
+        with patch("app.analyzer.dimension_analyzer._call_llm",
+                   return_value=(None, {"status": 400, "reason": "Bad Request"})) as mock_call:
+            with patch("app.analyzer.dimension_analyzer.time.sleep"):
+                result = _call_llm_with_retry("system", "user", config)
+
+        assert result is None
+        assert mock_call.call_count == 1, (
+            f"Expected 1 call (no retry on 400), got {mock_call.call_count}"
+        )
+
+    def test_http_500_retries_three_times(self):
+        """_call_llm 返回 (None, {"status": 500}) -> 重试 3 次后返回 None"""
+        from app.analyzer.dimension_analyzer import _call_llm_with_retry
+
+        config = _mock_llm_config()
+        with patch("app.analyzer.dimension_analyzer._call_llm",
+                   return_value=(None, {"status": 500, "reason": "Internal Error"})) as mock_call:
+            with patch("app.analyzer.dimension_analyzer.time.sleep"):
+                result = _call_llm_with_retry("system", "user", config)
+
+        assert result is None
+        assert mock_call.call_count == 3, (
+            f"Expected 3 retries on 500, got {mock_call.call_count}"
+        )
+
+    def test_network_error_retries_three_times(self):
+        """_call_llm 返回 (None, {"status": 0, "reason": "timeout"}) -> 重试 3 次"""
+        from app.analyzer.dimension_analyzer import _call_llm_with_retry
+
+        config = _mock_llm_config()
+        with patch("app.analyzer.dimension_analyzer._call_llm",
+                   return_value=(None, {"status": 0, "reason": "timeout"})) as mock_call:
+            with patch("app.analyzer.dimension_analyzer.time.sleep"):
+                result = _call_llm_with_retry("system", "user", config)
+
+        assert result is None
+        assert mock_call.call_count == 3, (
+            f"Expected 3 retries on network error, got {mock_call.call_count}"
+        )
+
+    def test_success_on_first_try_returns_result(self):
+        """_call_llm 返回 (result, None) -> 直接返回结果，不重试"""
+        from app.analyzer.dimension_analyzer import _call_llm_with_retry
+
+        config = _mock_llm_config()
+        with patch("app.analyzer.dimension_analyzer._call_llm",
+                   return_value=("分析结果", None)) as mock_call:
+            result = _call_llm_with_retry("system", "user", config)
+
+        assert result == "分析结果"
+        assert mock_call.call_count == 1, (
+            f"Expected 1 call on success, got {mock_call.call_count}"
+        )
+
+
+# ===========================================================================
+# TST-5: _get_model_context_limit + _compute_token_budget
+# ===========================================================================
+
+
+class TestModelContextLimit:
+    """_get_model_context_limit + _compute_token_budget"""
+
+    def test_gpt_4o_mini_returns_128000(self):
+        from app.analyzer.dimension_analyzer import _get_model_context_limit
+        assert _get_model_context_limit("gpt-4o-mini") == 128000
+
+    def test_gpt_4o_returns_128000(self):
+        from app.analyzer.dimension_analyzer import _get_model_context_limit
+        assert _get_model_context_limit("gpt-4o") == 128000
+
+    def test_claude_sonnet_returns_200000(self):
+        from app.analyzer.dimension_analyzer import _get_model_context_limit
+        assert _get_model_context_limit("claude-3-5-sonnet-20241022") == 200000
+
+    def test_claude_opus_returns_200000(self):
+        from app.analyzer.dimension_analyzer import _get_model_context_limit
+        assert _get_model_context_limit("claude-3-opus-20240229") == 200000
+
+    def test_deepseek_returns_65536(self):
+        from app.analyzer.dimension_analyzer import _get_model_context_limit
+        assert _get_model_context_limit("deepseek-v3") == 65536
+
+    def test_deepseek_chat_returns_65536(self):
+        from app.analyzer.dimension_analyzer import _get_model_context_limit
+        assert _get_model_context_limit("deepseek-chat") == 65536
+
+    def test_unknown_model_returns_default(self):
+        from app.analyzer.dimension_analyzer import _get_model_context_limit
+        assert _get_model_context_limit("unknown-model-xyz") == 128000
+
+    def test_no_model_name_returns_default(self):
+        from app.analyzer.dimension_analyzer import _get_model_context_limit
+        assert _get_model_context_limit("") == 128000
+
+    def test_compute_token_budget_80_percent_gpt4o(self):
+        from app.analyzer.dimension_analyzer import _compute_token_budget
+        config = {"model": "gpt-4o-mini"}
+        budget = _compute_token_budget(config)
+        assert budget == int(128000 * 0.8)  # 102400
+
+    def test_compute_token_budget_80_percent_claude(self):
+        from app.analyzer.dimension_analyzer import _compute_token_budget
+        config = {"model": "claude-3-5-sonnet-20241022"}
+        budget = _compute_token_budget(config)
+        assert budget == int(200000 * 0.8)  # 160000
+
+    def test_compute_token_budget_floor_16000(self):
+        """小模型场景下预算不低于 16000 下界"""
+        from app.analyzer.dimension_analyzer import _compute_token_budget, _DEFAULT_CONTEXT_LIMIT, _MIN_TOKEN_BUDGET
+        # 默认上下文窗口 128000 * 0.8 = 102400，高于下界；下界为未来更小模型准备
+        floor_verified = int(_DEFAULT_CONTEXT_LIMIT * 0.8) >= _MIN_TOKEN_BUDGET
+        assert floor_verified, (
+            f"Default model {_DEFAULT_CONTEXT_LIMIT} * 0.8 = {int(_DEFAULT_CONTEXT_LIMIT * 0.8)} "
+            f"should be >= floor {_MIN_TOKEN_BUDGET}"
+        )

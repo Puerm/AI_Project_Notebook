@@ -556,8 +556,8 @@ class TestLLMAssistant:
         from app.analyzer.llm_assistant import _call_llm
         config = {"api_key": None, "api_base": None, "model": "gpt-4o-mini",
                   "provider": "openai"}
-        result = _call_llm("system", "user", config)
-        assert result is None
+        result, err_info = _call_llm("system", "user", config)
+        assert result is None and err_info is None
 
 
 # ===========================================================================
